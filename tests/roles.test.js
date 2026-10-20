@@ -19,6 +19,42 @@ test('the clinic hub exposes all five visible professions', () => {
   }
 });
 
+test('campus storefront hotspots use conservative, scene-relative geometry', () => {
+  const expectedHotspots = {
+    dietetics: { left: 2.8, top: 12.4, width: 16, height: 51.5 },
+    generalPractice: { left: 25, top: 27.6, width: 12, height: 33.4 },
+    nursing: { left: 42.8, top: 34.7, width: 10.8, height: 25.5 },
+    psychology: { left: 72.7, top: 37.2, width: 8.2, height: 23.4 },
+    pharmacy: { left: 85.9, top: 30, width: 11.3, height: 30.4 },
+  };
+  for (const [roleId, hotspot] of Object.entries(expectedHotspots)) {
+    assert.deepEqual(getRole(roleId).hotspot, hotspot);
+    assert.ok(hotspot.left >= 0 && hotspot.top >= 0);
+    assert.ok(hotspot.left + hotspot.width <= 100 && hotspot.top + hotspot.height <= 100);
+  }
+});
+
+test('campus controls provide per-role perspective and kiosk affordance contracts', () => {
+  const css = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+  const hub = fs.readFileSync(new URL('../src/ui/campusHub.js', import.meta.url), 'utf8');
+  for (const role of Object.values(ROLES)) {
+    assert.match(css, new RegExp(`\\.campus-hotspot--${role.theme} \\{ --facade-shape: polygon\\(`));
+    assert.match(css, new RegExp(`\\.campus-directory-hotspot--${role.theme}`));
+    assert.match(hub, new RegExp(`campus-directory-hotspot--\\$\\{role\\.theme\\}`));
+  }
+  assert.match(css, /\.campus-directory-hotspot::after[^}]*opacity: \.33/);
+  assert.match(css, /\.campus-directory-hotspot:hover::after, \.campus-directory-hotspot:focus-visible::after[^}]*opacity: \.94/);
+  assert.match(css, /\.campus-directory-hotspots\[hidden\] \{ display: none;/);
+  assert.match(css, /\.campus-hotspot:focus-visible \{ outline: 3px solid #fff/);
+});
+
+test('campus artwork and its interactive controls share one centered source-ratio cover plane', () => {
+  const css = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+  const hub = fs.readFileSync(new URL('../src/ui/campusHub.js', import.meta.url), 'utf8');
+  assert.match(hub, /<div class="campus-art-plane"><img class="campus-scene__image"[\s\S]*?<\/nav><button class="campus-kiosk-return"[\s\S]*?<button class="campus-kiosk-enter"[\s\S]*?<\/div><p class="campus-scene__feedback"/);
+  assert.match(css, /\.campus-art-plane \{[^}]*top: 50%;[^}]*left: 50%;[^}]*width: max\(100%, calc\(100vh \* 1\.776833\)\);[^}]*height: max\(100%, calc\(100vw \* \.562799\)\);[^}]*transform: translate\(-50%, -50%\)/);
+});
+
 test('dietetics is the sole open role', () => {
   assert.equal(getRole('dietetics').unlocked, true);
   assert.deepEqual(Object.values(ROLES).filter((role) => role.unlocked).map((role) => role.id), ['dietetics']);

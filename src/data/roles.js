@@ -8,7 +8,7 @@ export const ROLES = {
     theme: 'dietetics',
     panelAsset: 'campus-panel-dietetics.png',
     unlocked: true,
-    hotspot: { left: 2, top: 14, width: 17, height: 50 },
+    hotspot: { left: 2.8, top: 12.4, width: 16, height: 51.5 },
     manual: {
       purpose: 'Comprendre les habitudes de vie et accompagner des objectifs alimentaires réalistes.',
       skills: ['Mener une anamnèse alimentaire', 'Adapter sa communication au contexte', 'Construire un plan sûr et réalisable'],
@@ -25,7 +25,7 @@ export const ROLES = {
     panelAsset: 'campus-panel-general-practice.png',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
-    hotspot: { left: 24, top: 27, width: 14, height: 43 },
+    hotspot: { left: 25, top: 27.6, width: 12, height: 33.4 },
     manual: {
       purpose: 'Observer, orienter et coordonner les étapes d’un parcours de soin.',
       skills: ['Prioriser les informations', 'Repérer les signaux d’alerte', 'Orienter de façon sécurisée'],
@@ -42,7 +42,7 @@ export const ROLES = {
     panelAsset: 'campus-panel-nursing.png',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
-    hotspot: { left: 42, top: 34, width: 14, height: 42 },
+    hotspot: { left: 42.8, top: 34.7, width: 10.8, height: 25.5 },
     manual: {
       purpose: 'Accompagner, surveiller et soutenir les personnes dans leur quotidien de soin.',
       skills: ['Observer une évolution', 'Transmettre une information utile', 'Soutenir l’autonomie'],
@@ -59,7 +59,7 @@ export const ROLES = {
     panelAsset: 'campus-panel-psychology.png',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
-    hotspot: { left: 70, top: 34, width: 14, height: 43 },
+    hotspot: { left: 72.7, top: 37.2, width: 8.2, height: 23.4 },
     manual: {
       purpose: 'Créer un espace d’écoute sûr et comprendre les facteurs psychologiques.',
       skills: ['Écoute active', 'Reformulation', 'Repérage des besoins d’orientation'],
@@ -76,7 +76,7 @@ export const ROLES = {
     panelAsset: 'campus-panel-pharmacy.png',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
-    hotspot: { left: 86, top: 27, width: 14, height: 43 },
+    hotspot: { left: 85.9, top: 30, width: 11.3, height: 30.4 },
     manual: {
       purpose: 'Informer et sécuriser le bon usage des traitements au plus près des personnes.',
       skills: ['Expliquer un traitement', 'Prévenir les risques', 'Orienter vers le bon interlocuteur'],

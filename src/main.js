@@ -25,10 +25,10 @@ export function navigate(view, params = {}) {
 
     switch (view) {
         case 'menu':
-            renderMenu(app);
+            renderMenu(app, params.hubFeedback);
             break;
         case 'levels':
-            renderLevelSelect(app);
+            renderLevelSelect(app, params.roleId);
             break;
         case 'game':
             renderChat(app, params.missionId);

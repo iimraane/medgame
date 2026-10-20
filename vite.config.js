@@ -12,7 +12,6 @@ export default defineConfig({
             '/game/api': {
                 target: 'http://localhost:3001',
                 changeOrigin: true,
-                rewrite: (path) => path.replace(/^\/game\/api/, '/api'),
             },
         },
     },

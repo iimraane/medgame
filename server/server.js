@@ -7,6 +7,7 @@ import OpenAI from 'openai';
 import crypto from 'crypto';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { dirname, join } from 'path';
+import { createOriginGuard, isAllowedOrigin } from './origins.js';
 
 // Dynamic imports for game data (handles Windows paths with spaces)
 const __filename = fileURLToPath(import.meta.url);
@@ -23,8 +24,7 @@ const { getServerMission, evaluateServerMission } = await import(pathToFileURL(j
 dotenv.config({ path: join(__dirname, '..', '.env') });
 
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(cors({ origin: (origin, callback) => callback(null, !origin || isAllowedOrigin(origin)) }));
 
 // ─── Serve built frontend ────────────────────────────────────────
 const distPath = join(__dirname, '..', 'dist');
@@ -65,28 +65,8 @@ app.use('/game/api', (req, res, next) => {
 });
 
 // Security middleware: Ensure requests only come from our domain
-const ALLOWED_ORIGINS = ['https://whatsapp.immo.harpytech.fr', 'https://medgame.harpytech.fr'];
-app.use('/game/api', (req, res, next) => {
-    const origin = req.headers.origin;
-    const referer = req.headers.referer;
-
-    // Allow requests with no origin/referer (like curl) only if we wanted to.
-    // For a pure web app, we can mandate it:
-    if (origin && !ALLOWED_ORIGINS.includes(origin)) {
-        return res.status(403).json({ error: 'Origine non autorisée.' });
-    }
-
-    if (!origin && referer) {
-        try {
-            const refererUrl = new URL(referer);
-            if (!ALLOWED_ORIGINS.includes(refererUrl.origin)) {
-                return res.status(403).json({ error: 'Referer non autorisé.' });
-            }
-        } catch (e) { }
-    }
-
-    next();
-});
+app.use('/game/api', createOriginGuard());
+app.use(express.json({ limit: '10mb' }));
 
 // ─── Session Store ───────────────────────────────────────────────
 const sessions = new Map();
@@ -250,7 +230,7 @@ app.post('/game/api/start', async (req, res) => {
         if (missionId) {
             const mission = getServerMission(missionId);
             const role = getRole(roleId);
-            if (!mission || !role || !role.unlocked || roleId !== 'dietetics') return res.status(400).json({ error: 'Mission ou rôle invalide' });
+            if (!mission || !role?.unlocked) return res.status(400).json({ error: 'Mission ou rôle invalide' });
             const sessionId = crypto.randomUUID();
             sessions.set(sessionId, { createdAt: Date.now(), missionId, roleId, mission, prompt: buildMissionPatientPrompt(mission), messages: [] });
             return res.json({ sessionId, patient: { name: { firstName: mission.patient.name, fullName: mission.patient.name, age: mission.patient.age, gender: 'Personne fictive' }, opening: mission.patient.opening, modifiers: [], antecedentsHtml: 'Cas fictif d’apprentissage. Aucune recommandation clinique personnalisée.' } });

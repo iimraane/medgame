@@ -18,3 +18,9 @@ npm run start
 ```
 
 Open `http://localhost:5173`. Run `npm run build` for a production bundle and `node --test tests/engine.test.js tests/storage.test.js` for the focused test suite.
+
+## Clinique des parcours
+
+La page d’accueil présente une allée de clinique avec cinq portes de profession. La Diététique est le seul parcours ouvert et mène aux missions existantes. Les portes de médecine générale, soins infirmiers, psychologie et pharmacie indiquent clairement qu’elles arrivent bientôt et ne créent aucune session.
+
+En développement, l’API accepte uniquement les origines Vite `http://localhost:5173` et `http://127.0.0.1:5173`, en plus des origines de production existantes. Avec `NODE_ENV=production`, seules les deux origines HTTPS de production restent autorisées.

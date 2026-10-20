@@ -48,6 +48,24 @@ test('campus controls provide per-role perspective and kiosk affordance contract
   assert.match(css, /\.campus-hotspot:focus-visible \{ outline: 3px solid #fff/);
 });
 
+test('arcade kiosk affordances stay local, role-coloured, and motion-safe', () => {
+  const css = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+  const hub = fs.readFileSync(new URL('../src/ui/campusHub.js', import.meta.url), 'utf8');
+  for (const role of Object.values(ROLES)) {
+    assert.match(css, new RegExp(`\\.campus-directory-hotspot--${role.theme} \\{ --campus-accent:`));
+  }
+  assert.match(css, /\.campus-directory-hotspot::after, \.campus-kiosk-return::after, \.campus-kiosk-enter::after/);
+  assert.match(css, /\.campus-directory-hotspot:hover::before, \.campus-directory-hotspot:focus-visible::before[\s\S]*?animation: campus-kiosk-sweep/);
+  assert.match(css, /\.campus-directory-hotspot:hover::after, \.campus-directory-hotspot:focus-visible::after[\s\S]*?animation: campus-kiosk-pulse/);
+  assert.match(css, /\.campus-directory-hotspot:active::after, \.campus-kiosk-return:active::after, \.campus-kiosk-enter:active::after/);
+  assert.match(css, /\.campus-directory-hotspot:focus-visible, \.campus-kiosk-return:focus-visible, \.campus-kiosk-enter:focus-visible \{ outline: 3px solid #fff; outline-offset: -3px;/);
+  assert.match(css, /\.campus-kiosk-return \{ --terminal-accent: #70efff;/);
+  assert.match(css, /\.campus-kiosk-enter \{ --terminal-accent: #69a9ff;/);
+  assert.match(hub, /enterButton\.hidden = roleId !== 'dietetics';/);
+  assert.match(hub, /if \(activeRoleId === 'dietetics'\) navigate\('levels', \{ roleId: 'dietetics' \}\);/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.campus-directory-hotspot::before, \.campus-kiosk-return::before, \.campus-kiosk-enter::before \{ display: none;[\s\S]*?animation: none;/);
+});
+
 test('campus artwork and its interactive controls share one centered source-ratio cover plane', () => {
   const css = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
   const hub = fs.readFileSync(new URL('../src/ui/campusHub.js', import.meta.url), 'utf8');

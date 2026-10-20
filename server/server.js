@@ -16,6 +16,8 @@ const dataDir = join(__dirname, '..', 'src', 'data');
 const { LEVELS, getLevel } = await import(pathToFileURL(join(dataDir, 'levels.js')).href);
 const { CARDS, getCardsForLevel } = await import(pathToFileURL(join(dataDir, 'cards.js')).href);
 const { MODIFIERS, pickRandomModifiers } = await import(pathToFileURL(join(dataDir, 'modifiers.js')).href);
+const { getRole } = await import(pathToFileURL(join(dataDir, 'roles.js')).href);
+const { getServerMission, evaluateServerMission } = await import(pathToFileURL(join(__dirname, 'missions.js')).href);
 
 // Ensure .env is loaded from the root 'game' directory
 dotenv.config({ path: join(__dirname, '..', '.env') });
@@ -168,6 +170,13 @@ ${difficultyInstructions[difficulty] || difficultyInstructions.moyen}
 7. Ne fais JAMAIS l'IA. Reste dans ton rôle de patient inquiet ou gêné.`;
 }
 
+function buildMissionPatientPrompt(mission) {
+    return `You are ${mission.patient.name}, a fictional patient in an educational dietetics simulation. This is not real medical advice.
+Your opening is: "${mission.patient.opening}"
+Your context: ${mission.constraints.join('; ')}.
+Answer in French, warmly and briefly (one or two sentences). Reveal practical details only when asked. Never diagnose yourself, prescribe treatment, or provide patient-specific clinical advice. For the safety mission, respond to respectful acknowledgement and orientation without minimising the need for appropriate professional support.`;
+}
+
 // ─── Guardrail Prompt (VERY LENIENT) ─────────────────────────────
 const GUARDRAIL_PROMPT = `Tu es un filtre de contenu pour un jeu de simulation médicale.
 Le joueur joue un médecin qui parle à un patient simulé par IA.
@@ -237,7 +246,15 @@ Réponds JUSTE avec les puces (ex: • Fumeur actif \n• Allergie Pénicilline 
 // ─── Start Session ───────────────────────────────────────────────
 app.post('/game/api/start', async (req, res) => {
     try {
-        const { levelId } = req.body;
+        const { levelId, missionId, roleId } = req.body;
+        if (missionId) {
+            const mission = getServerMission(missionId);
+            const role = getRole(roleId);
+            if (!mission || !role || !role.unlocked || roleId !== 'dietetics') return res.status(400).json({ error: 'Mission ou rôle invalide' });
+            const sessionId = crypto.randomUUID();
+            sessions.set(sessionId, { createdAt: Date.now(), missionId, roleId, mission, prompt: buildMissionPatientPrompt(mission), messages: [] });
+            return res.json({ sessionId, patient: { name: { firstName: mission.patient.name, fullName: mission.patient.name, age: mission.patient.age, gender: 'Personne fictive' }, opening: mission.patient.opening, modifiers: [], antecedentsHtml: 'Cas fictif d’apprentissage. Aucune recommandation clinique personnalisée.' } });
+        }
         const level = getLevel(levelId);
         if (!level) return res.status(400).json({ error: 'Niveau invalide' });
 
@@ -286,6 +303,17 @@ app.post('/game/api/start', async (req, res) => {
         console.error('Start error:', err.message);
         res.status(500).json({ error: 'Erreur serveur' });
     }
+});
+
+app.post('/game/api/evaluate', async (req, res) => {
+    const { sessionId, actions = [] } = req.body;
+    const session = sessions.get(sessionId);
+    if (!session?.mission) return res.status(400).json({ error: 'Session expirée ou invalide.' });
+    const transcript = session.messages.filter((message) => message.role === 'user').map((message) => message.content).join('\n');
+    // Deterministic, server-owned scoring keeps feedback safe when the model is unavailable.
+    const result = evaluateServerMission(session.missionId, transcript, Array.isArray(actions) ? actions : []);
+    sessions.delete(sessionId);
+    res.json(result);
 });
 
 // ─── Chat (with built-in guardrail) ─────────────────────────────

@@ -1,0 +1,9 @@
+// Client-safe mission metadata only. Case constraints, rubrics and patient truth live in server/missions.js.
+export const COMPETENCY_AXES = ['foodHistory', 'context', 'communication', 'safePlan'];
+export const MISSIONS = [
+  { id: 'dietetics-everyday-constraints', roleId: 'dietetics', order: 1, title: 'Contraintes du quotidien', icon: '🛒', summary: 'Construire un échange alimentaire adapté à une vraie semaine.', objectives: ['Recueillir l’histoire alimentaire', 'Explorer le budget, le rythme et les préférences', 'Co-construire une prochaine étape réaliste'], permittedTools: ['Questions d’histoire alimentaire', 'Planificateur d’objectif'], safetyBoundary: null },
+  { id: 'dietetics-habit-follow-up', roleId: 'dietetics', order: 2, title: 'Suivi durable', icon: '🌱', summary: 'Soutenir l’adhésion et ajuster un plan sans poursuivre la perfection.', objectives: ['Identifier ce qui a été praticable', 'Comprendre les freins sans jugement', 'Co-construire un objectif plus petit et durable'], permittedTools: ['Questions de suivi', 'Planificateur d’objectif'], safetyBoundary: null },
+  { id: 'dietetics-safety-orientation', roleId: 'dietetics', order: 3, title: 'Limite de sécurité', icon: '🧭', summary: 'Reconnaître quand l’accompagnement nutritionnel doit laisser place à une orientation adaptée.', objectives: ['Répondre avec respect', 'Reconnaître la limite de sécurité', 'Proposer une orientation ou une escalade adaptée'], permittedTools: ['Orientation sécurité'], safetyBoundary: { requiredAction: 'orientation', explanation: 'Cette mission requiert une orientation vers un soutien approprié.' } },
+];
+export function getMission(id) { return MISSIONS.find((mission) => mission.id === id); }
+export function getMissionsForRole(roleId) { return MISSIONS.filter((mission) => mission.roleId === roleId); }

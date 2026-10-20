@@ -6,11 +6,11 @@ const API_BASE = '/game/api';
 /**
  * Start a new game session on the server
  */
-export async function startSession(levelId) {
+export async function startSession(payload) {
     const res = await fetch(`${API_BASE}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ levelId }),
+        body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
@@ -39,6 +39,15 @@ export async function guessDiagnosis(sessionId, guessedConditionId) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, guessedConditionId }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+}
+
+export async function evaluateMission(sessionId, actions = []) {
+    const res = await fetch(`${API_BASE}/evaluate`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, actions }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);

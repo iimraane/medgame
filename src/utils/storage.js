@@ -4,12 +4,9 @@
 const STORAGE_KEY = 'medgame_save';
 const SETTINGS_KEY = 'medgame_settings';
 
-const DEFAULT_SAVE = {
-    currentLevel: 1,
-    maxUnlockedLevel: 1,
-    scores: {},       // { levelId: { score, stars, attempts } }
-    unlockedCards: [],
-    firstTime: true,
+export const DEFAULT_SAVE = {
+    currentLevel: 1, maxUnlockedLevel: 1, scores: {}, unlockedCards: [], firstTime: true,
+    selectedRole: 'dietetics', missionProgress: {},
 };
 
 const DEFAULT_SETTINGS = {
@@ -19,19 +16,50 @@ const DEFAULT_SETTINGS = {
     transcriptionEnabled: false,
 };
 
+export function migrateSave(raw) {
+    const legacy = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    return {
+        ...DEFAULT_SAVE, ...legacy,
+        selectedRole: legacy.selectedRole || 'dietetics',
+        missionProgress: sanitizeMissionProgress(legacy.missionProgress) || (legacy.maxUnlockedLevel > 1 ? { 'dietetics-everyday-constraints': { attempts: 1, bestScore: 0, mastered: false } } : {}),
+        scores: legacy.scores && typeof legacy.scores === 'object' ? legacy.scores : {},
+        unlockedCards: Array.isArray(legacy.unlockedCards) ? legacy.unlockedCards : [],
+    };
+}
+
+function sanitizeMissionProgress(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return Object.fromEntries(Object.entries(value).map(([id, entry]) => [id, {
+        attempts: Number.isFinite(entry?.attempts) && entry.attempts >= 0 ? entry.attempts : 0,
+        bestScore: Number.isFinite(entry?.bestScore) && entry.bestScore >= 0 ? entry.bestScore : 0,
+        mastered: Boolean(entry?.mastered),
+        ...(entry?.lastResult && typeof entry.lastResult === 'object' ? { lastResult: entry.lastResult } : {}),
+    }]));
+}
+
 export function loadSave() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return { ...DEFAULT_SAVE };
-        return { ...DEFAULT_SAVE, ...JSON.parse(raw) };
-    } catch {
-        return { ...DEFAULT_SAVE };
-    }
+    try { const raw = localStorage.getItem(STORAGE_KEY); return migrateSave(raw ? JSON.parse(raw) : {}); }
+    catch { return migrateSave({}); }
 }
 
 export function saveSave(data) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    document.cookie = `medgame_active=true; max-age=${60 * 60 * 24 * 365}; path=/`;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(migrateSave(data)));
+    if (typeof document !== 'undefined') document.cookie = `medgame_active=true; max-age=${60 * 60 * 24 * 365}; path=/`;
+}
+
+export function recordMissionResult(missionId, result) {
+    const save = loadSave();
+    const prior = save.missionProgress[missionId] || { attempts: 0, bestScore: 0, mastered: false };
+    save.missionProgress[missionId] = { attempts: prior.attempts + 1, bestScore: Math.max(prior.bestScore, result.total || 0), mastered: prior.mastered || Boolean(result.mastery), lastResult: result };
+    save.firstTime = false;
+    saveSave(save);
+    return save;
+}
+
+export function isMissionUnlocked(mission, missions, save = loadSave()) {
+    if (mission.order === 1) return true;
+    const previous = missions.find((item) => item.roleId === mission.roleId && item.order === mission.order - 1);
+    return Boolean(previous && save.missionProgress[previous.id]?.mastered);
 }
 
 export function loadSettings() {

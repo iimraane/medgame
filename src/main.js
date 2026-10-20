@@ -5,6 +5,7 @@ import { renderMenu } from './ui/menu.js';
 import { renderLevelSelect } from './ui/levelSelect.js';
 import { renderChat } from './ui/chat.js';
 import { renderSettings } from './ui/settings.js';
+import { renderDebrief } from './ui/debrief.js';
 import { loadSettings } from './utils/storage.js';
 import { setVolume, setSoundEnabled, sfx_click } from './utils/sound.js';
 
@@ -30,7 +31,10 @@ export function navigate(view, params = {}) {
             renderLevelSelect(app);
             break;
         case 'game':
-            renderChat(app, params.levelId);
+            renderChat(app, params.missionId);
+            break;
+        case 'debrief':
+            renderDebrief(app, params.result);
             break;
         case 'settings':
             renderSettings(app);

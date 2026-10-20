@@ -1,47 +1,8 @@
-// ─── Menu View ───────────────────────────────────────────────────
-
 import { navigate } from '../main.js';
-import { loadSave, resetAll } from '../utils/storage.js';
-import { showCustomConfirm } from '../utils/helpers.js';
-
+import { loadSave } from '../utils/storage.js';
 export function renderMenu(container) {
-  const save = loadSave();
-  const hasSave = save.maxUnlockedLevel > 1;
-
-  container.innerHTML = `
-    <div class="view menu">
-      <div class="menu__logo">🏥</div>
-      <h1 class="menu__title">MedGame</h1>
-      <p class="menu__subtitle">Simulation de Consultation Médicale</p>
-      <div class="menu__actions">
-        ${hasSave ? `
-          <button class="btn btn--primary" id="btn-continue">
-            ▶️ Continuer (Niveau ${save.maxUnlockedLevel})
-          </button>
-        ` : ''}
-        <button class="btn btn--primary" id="btn-play">
-          ${hasSave ? '📋 Sélection de niveau' : '🩺 Commencer'}
-        </button>
-        <button class="btn btn--secondary" id="btn-settings">
-          ⚙️ Paramètres
-        </button>
-      </div>
-    </div>
-  `;
-
-  // Bind events
-  const continueBtn = container.querySelector('#btn-continue');
-  if (continueBtn) {
-    continueBtn.addEventListener('click', () => {
-      navigate('game', { levelId: save.maxUnlockedLevel });
-    });
-  }
-
-  container.querySelector('#btn-play').addEventListener('click', () => {
-    navigate('levels');
-  });
-
-  container.querySelector('#btn-settings').addEventListener('click', () => {
-    navigate('settings');
-  });
+  const completed = Object.values(loadSave().missionProgress).filter((progress) => progress.attempts).length;
+  container.innerHTML = `<div class="view menu career-hub"><div class="menu__logo">🥕</div><p class="career-hub__eyebrow">MedGame · simulation éducative fictive</p><h1 class="menu__title">La clinique des parcours</h1><p class="menu__subtitle">Apprendre des démarches de soin sûres et observables, jamais du conseil personnalisé.</p><div class="career-hub__progress">${completed}/3 missions de diététique pratiquées</div><div class="menu__actions"><button class="btn btn--primary" id="btn-play">Entrer dans la clinique</button><button class="btn btn--secondary" id="btn-settings">Paramètres</button></div></div>`;
+  container.querySelector('#btn-play').addEventListener('click', () => navigate('levels'));
+  container.querySelector('#btn-settings').addEventListener('click', () => navigate('settings'));
 }

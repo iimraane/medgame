@@ -480,6 +480,22 @@ a {
     color: var(--purple-500);
 }
 
+/* ─── Career mode ────────────────────────────────────────────── */
+.career-hub__eyebrow { color: var(--green-600); font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.career-hub__progress, .role-strip, .mission-status { color: var(--text-secondary); font-size: .9rem; }
+.career-hub__progress { margin: -32px 0 28px; }
+.role-strip { padding: 14px 32px; display:flex; gap: 20px; background: var(--green-50); }
+.role-strip__locked { opacity: .55; }
+.mission-briefing { max-width: 720px; margin: 42px auto; padding: 32px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); }
+.mission-briefing h1 { margin: 8px 0; }.mission-briefing h2 { font-size: 1rem; margin-top: 24px; }.mission-briefing li { margin: 8px 0; }
+.mission-briefing__boundary { padding: 12px; border-left: 4px solid var(--green-500); background: var(--green-50); }
+.career-chat .chat__body { display: grid; grid-template-columns: 250px minmax(0, 1fr); flex: 1; overflow: hidden; }
+.mission-objectives { padding: 22px; background: var(--bg-card); border-right: 1px solid var(--border); }.mission-objectives h2 { font-size: 1rem; }.mission-objectives li { margin: 10px 0; font-size: .9rem; }
+.career-chat__actions { display:flex; gap:8px; margin-top:8px; }.career-chat__actions .btn { padding: 9px 12px; }
+.debrief { max-width: 680px; margin: 48px auto; padding: 34px; background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); }
+.debrief__axis { display:grid; grid-template-columns: 1fr auto; gap: 8px; margin: 18px 0; }.debrief__axis > div { grid-column: 1 / -1; height: 9px; background: var(--gray-200); border-radius: 99px; overflow:hidden; }.debrief__axis i { display:block; height:100%; background: linear-gradient(90deg, var(--green-500), var(--blue-500)); }.debrief__feedback { margin: 28px 0; padding: 18px; background: var(--blue-50); border-radius: var(--radius-md); }
+@media (max-width: 700px) { .career-chat .chat__body { grid-template-columns: 1fr; }.mission-objectives { display:none; }.mission-briefing, .debrief { margin: 18px; } }
+
 /* ─── CHAT VIEW ──────────────────────────────────────────────── */
 .chat {
     height: 100%;

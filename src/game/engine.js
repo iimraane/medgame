@@ -1,220 +1,33 @@
-// ─── Game Engine ─────────────────────────────────────────────────
-// Core game logic: manages game state, chat flow, scoring, and level progression.
-// NO message limit — difficulty comes from the AI patient behavior.
-
-import { getLevel, LEVELS } from '../data/levels.js';
-import { getCardsForLevel } from '../data/cards.js';
-import { getUnlockedPerks, getPerkUnlockedAtLevel } from '../data/perks.js';
-import { startSession, sendMessage, guessDiagnosis, requestExams } from './ai.js';
-import { loadSave, updateLevelScore, unlockCards } from '../utils/storage.js';
+import { getMission, getMissionsForRole } from '../data/missions.js';
+import { getRole } from '../data/roles.js';
+import { startSession, sendMessage, evaluateMission } from './ai.js';
+import { loadSave, recordMissionResult, isMissionUnlocked } from '../utils/storage.js';
+import { offlineFallbackFeedback } from './evaluation.js';
 
 class GameEngine {
-    constructor() {
-        this.currentLevel = null;
-        this.sessionId = null;
-        this.patient = null;
-        this.messages = [];       // { role: 'doctor'|'patient', content: string }
-        this.isWaiting = false;
-        this.isFinished = false;
-        this.messageCount = 0;
-        this.onMessage = null;
-        this.onTyping = null;
-        this.onError = null;
-        this.onFinish = null;
-        this.onGuardrailFail = null;
-        this.onEvaluating = null;
-        this.perksUsed = {
-            lab: false,
-            coffee: false,
-            imaging: false,
-        };
-    }
-
-    /**
-     * Start a new level — creates session on server
-     */
-    async startLevel(levelId) {
-        const level = getLevel(levelId);
-        if (!level) throw new Error(`Level ${levelId} not found`);
-
-        this.currentLevel = level;
-        this.messages = [];
-        this.isWaiting = false;
-        this.isFinished = false;
-        this.messageCount = 0;
-
-        // Create session on server (prompt/patient generated server-side)
-        const { sessionId, patient } = await startSession(levelId);
-        this.sessionId = sessionId;
-        this.patient = patient;
-
-        // Unlock new cards for this level
-        const newCards = unlockCards(level.cardPool);
-
-        // Get available cards and perks
-        const save = loadSave();
-        const cards = getCardsForLevel(save.unlockedCards);
-        const perks = getUnlockedPerks(save.maxUnlockedLevel);
-        const newPerk = getPerkUnlockedAtLevel(levelId);
-
-        return {
-            patient: this.patient,
-            cards,
-            perks,
-            newCards,
-            newPerk,
-            level,
-        };
-    }
-
-    /**
-     * Send a doctor message
-     */
-    async sendDoctorMessage(text) {
-        if (this.isWaiting || this.isFinished) return;
-
-        const trimmed = text.trim();
-        if (!trimmed) return;
-
-        this.isWaiting = true;
-
-        try {
-            // Add doctor message to local display
-            this.messages.push({ role: 'doctor', content: trimmed });
-            this.messageCount++;
-            if (this.onMessage) this.onMessage({ role: 'doctor', content: trimmed });
-
-            // Show typing indicator
-            if (this.onTyping) this.onTyping(true);
-
-            // Send to server (guardrail + AI in one call)
-            const response = await sendMessage(this.sessionId, trimmed);
-
-            if (this.onTyping) this.onTyping(false);
-
-            // Check if guardrail blocked it
-            if (response.guardrailFailed) {
-                // Remove the doctor message we added
-                this.messages.pop();
-                this.messageCount--;
-                if (this.onGuardrailFail) {
-                    this.onGuardrailFail(response.reason || 'Message inapproprié.');
-                }
-                this.isWaiting = false;
-                return;
-            }
-
-            // Add patient message
-            this.messages.push({ role: 'patient', content: response.message });
-            this.messageCount++;
-            if (this.onMessage) this.onMessage({ role: 'patient', content: response.message });
-
-        } catch (error) {
-            if (this.onTyping) this.onTyping(false);
-            if (this.onError) this.onError(error.message);
-        }
-
-        this.isWaiting = false;
-    }
-
-    /**
-     * Finish the consultation and get evaluation/guess result
-     */
-    async finishConsultation(guessedConditionId) {
-        if (this.isFinished) return;
-        this.isFinished = true;
-        this.isWaiting = true;
-
-        if (this.onEvaluating) this.onEvaluating(true);
-
-        try {
-            const result = await guessDiagnosis(this.sessionId, guessedConditionId);
-
-            // Save score (100 if correct, 0 if false) to unlock next level
-            const score = result.isCorrect ? 100 : 0;
-            const stars = result.isCorrect ? 3 : 0;
-
-            const save = updateLevelScore(this.currentLevel.id, score, stars);
-
-            if (this.onEvaluating) this.onEvaluating(false);
-
-            if (this.onFinish) {
-                this.onFinish({
-                    ...result,
-                    score,
-                    stars,
-                    levelId: this.currentLevel.id,
-                    newMaxLevel: save.maxUnlockedLevel,
-                });
-            }
-        } catch (error) {
-            if (this.onEvaluating) this.onEvaluating(false);
-            if (this.onError) this.onError('Erreur lors du diagnostic : ' + error.message);
-            if (this.onFinish) {
-                this.onFinish({
-                    score: 0,
-                    stars: 0,
-                    feedback: 'Impossible de vérifier le diagnostic.',
-                    isCorrect: false,
-                    levelId: this.currentLevel.id,
-                });
-            }
-        }
-
-        this.isWaiting = false;
-    }
-
-    /**
-     * Perk: Get laboratory results
-     */
-    async getLabResults() {
-        if (this.perksUsed.lab) return null;
-        this.perksUsed.lab = true;
-        try {
-            const data = await requestExams(this.sessionId, 'lab');
-            return data.report;
-        } catch (e) {
-            console.error(e);
-            return "Erreur lors de l'obtention des résultats du labo.";
-        }
-    }
-
-    /**
-     * Perk: Coffee Pause (reduces message count)
-     */
-    useCoffeePause() {
-        if (this.perksUsed.coffee) return false;
-        this.perksUsed.coffee = true;
-        this.messageCount = Math.max(0, this.messageCount - 5);
-        return true;
-    }
-
-    /**
-     * Perk: Imaging Report
-     */
-    async getImagingReport() {
-        if (this.perksUsed.imaging) return null;
-        this.perksUsed.imaging = true;
-        try {
-            const data = await requestExams(this.sessionId, 'radio');
-            return data.report;
-        } catch (e) {
-            console.error(e);
-            return "Erreur lors de l'obtention du rapport d'imagerie.";
-        }
-    }
-
-    /**
-     * Get all levels with their status
-     */
-    static getLevelsWithStatus() {
-        const save = loadSave();
-        return LEVELS.map((level) => ({
-            ...level,
-            unlocked: level.id <= save.maxUnlockedLevel,
-            score: save.scores[level.id] || null,
-        }));
-    }
+  constructor() { this.sessionId = null; this.mission = null; this.patient = null; this.messages = []; this.actions = []; this.isWaiting = false; this.isFinished = false; this.onMessage = null; this.onTyping = null; this.onError = null; this.onGuardrailFail = null; this.onFinish = null; this.onEvaluating = null; }
+  async startMission(missionId) {
+    const mission = getMission(missionId); if (!mission) throw new Error('Mission introuvable.');
+    const save = loadSave(); const missions = getMissionsForRole(mission.roleId);
+    if (!getRole(mission.roleId)?.unlocked || !isMissionUnlocked(mission, missions, save)) throw new Error('Cette mission est verrouillée.');
+    this.mission = mission; this.messages = []; this.actions = []; this.isFinished = false;
+    const data = await startSession({ missionId, roleId: mission.roleId }); this.sessionId = data.sessionId; this.patient = data.patient;
+    return { mission, patient: data.patient };
+  }
+  async sendDoctorMessage(text) {
+    if (this.isWaiting || this.isFinished || !text.trim()) return; this.isWaiting = true;
+    try { this.messages.push({ role: 'doctor', content: text.trim() }); this.onMessage?.(this.messages.at(-1)); this.onTyping?.(true); const response = await sendMessage(this.sessionId, text.trim()); this.onTyping?.(false); if (response.guardrailFailed) { this.messages.pop(); this.onGuardrailFail?.(response.reason || 'Message unavailable.'); return; } this.messages.push({ role: 'patient', content: response.message }); this.onMessage?.(this.messages.at(-1)); }
+    catch (error) { this.onTyping?.(false); this.onError?.(error.message); } finally { this.isWaiting = false; }
+  }
+  async finishMission() {
+    if (this.isFinished || this.isWaiting) return; this.isFinished = true; this.isWaiting = true; this.onEvaluating?.(true);
+    const transcript = this.messages.filter((message) => message.role === 'doctor').map((message) => message.content).join('\n');
+    let result;
+    try { result = await evaluateMission(this.sessionId, this.actions); } catch { result = offlineFallbackFeedback(this.mission, transcript, this.actions); }
+    let save; try { save = recordMissionResult(this.mission.id, result); } catch { save = loadSave(); }
+    this.onEvaluating?.(false); this.onFinish?.({ ...result, mission: this.mission, progress: save.missionProgress[this.mission.id] }); this.isWaiting = false;
+  }
+  recordAction(action) { if (!this.actions.includes(action)) this.actions.push(action); }
+  static getMissionsWithStatus(roleId = 'dietetics') { const save = loadSave(); const missions = getMissionsForRole(roleId); return missions.map((mission) => ({ ...mission, unlocked: isMissionUnlocked(mission, missions, save), progress: save.missionProgress[mission.id] || null })); }
 }
-
 export default GameEngine;

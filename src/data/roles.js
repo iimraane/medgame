@@ -7,6 +7,12 @@ export const ROLES = {
     description: 'Explorer les habitudes, les contraintes et des objectifs réalistes, sans prescription personnalisée.',
     theme: 'dietetics',
     unlocked: true,
+    hotspot: { left: 2, top: 14, width: 17, height: 50 },
+    manual: {
+      purpose: 'Comprendre les habitudes de vie et accompagner des objectifs alimentaires réalistes.',
+      skills: ['Mener une anamnèse alimentaire', 'Adapter sa communication au contexte', 'Construire un plan sûr et réalisable'],
+      missions: 'Entretiens guidés, analyse de contexte et choix de stratégies d’accompagnement.',
+    },
   },
   generalPractice: {
     id: 'generalPractice',
@@ -17,6 +23,12 @@ export const ROLES = {
     theme: 'general-practice',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
+    hotspot: { left: 24, top: 27, width: 14, height: 43 },
+    manual: {
+      purpose: 'Observer, orienter et coordonner les étapes d’un parcours de soin.',
+      skills: ['Prioriser les informations', 'Repérer les signaux d’alerte', 'Orienter de façon sécurisée'],
+      missions: 'Situations de première ligne, tri et coordination interprofessionnelle.',
+    },
   },
   nursing: {
     id: 'nursing',
@@ -27,6 +39,12 @@ export const ROLES = {
     theme: 'nursing',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
+    hotspot: { left: 42, top: 34, width: 14, height: 42 },
+    manual: {
+      purpose: 'Accompagner, surveiller et soutenir les personnes dans leur quotidien de soin.',
+      skills: ['Observer une évolution', 'Transmettre une information utile', 'Soutenir l’autonomie'],
+      missions: 'Surveillance clinique, transmissions et accompagnement relationnel.',
+    },
   },
   psychology: {
     id: 'psychology',
@@ -37,6 +55,12 @@ export const ROLES = {
     theme: 'psychology',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
+    hotspot: { left: 70, top: 34, width: 14, height: 43 },
+    manual: {
+      purpose: 'Créer un espace d’écoute sûr et comprendre les facteurs psychologiques.',
+      skills: ['Écoute active', 'Reformulation', 'Repérage des besoins d’orientation'],
+      missions: 'Entretiens, alliance thérapeutique et repérage des ressources.',
+    },
   },
   pharmacy: {
     id: 'pharmacy',
@@ -47,6 +71,12 @@ export const ROLES = {
     theme: 'pharmacy',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
+    hotspot: { left: 86, top: 27, width: 14, height: 43 },
+    manual: {
+      purpose: 'Informer et sécuriser le bon usage des traitements au plus près des personnes.',
+      skills: ['Expliquer un traitement', 'Prévenir les risques', 'Orienter vers le bon interlocuteur'],
+      missions: 'Conseils de bon usage, prévention et coordination avec les soignants.',
+    },
   },
 };
 

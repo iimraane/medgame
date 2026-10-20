@@ -24,3 +24,7 @@ Open `http://localhost:5173`. Run `npm run build` for a production bundle and `n
 La page d’accueil présente une allée de clinique avec cinq portes de profession. La Diététique est le seul parcours ouvert et mène aux missions existantes. Les portes de médecine générale, soins infirmiers, psychologie et pharmacie indiquent clairement qu’elles arrivent bientôt et ne créent aucune session.
 
 En développement, l’API accepte uniquement les origines Vite `http://localhost:5173` et `http://127.0.0.1:5173`, en plus des origines de production existantes. Avec `NODE_ENV=production`, seules les deux origines HTTPS de production restent autorisées.
+
+## Campus interactif
+
+Le campus est une expérience desktop : sous 1024 px, l’application affiche un avis indiquant que le jeu est disponible sur PC. L’illustration source est stockée dans `src/public/assets/campus-hub.png` afin que Vite la publie sous `/game/assets/campus-hub.png`. Le bouton **Jouer** la précharge avant d’afficher le hub.

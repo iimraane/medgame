@@ -6,6 +6,7 @@ import { renderLevelSelect } from './ui/levelSelect.js';
 import { renderChat } from './ui/chat.js';
 import { renderSettings } from './ui/settings.js';
 import { renderDebrief } from './ui/debrief.js';
+import { renderCampusHub, renderCampusLoading } from './ui/campusHub.js';
 import { loadSettings } from './utils/storage.js';
 import { setVolume, setSoundEnabled, sfx_click } from './utils/sound.js';
 
@@ -29,6 +30,12 @@ export function navigate(view, params = {}) {
             break;
         case 'levels':
             renderLevelSelect(app, params.roleId);
+            break;
+        case 'loading':
+            renderCampusLoading(app);
+            break;
+        case 'hub':
+            renderCampusHub(app);
             break;
         case 'game':
             renderChat(app, params.missionId);

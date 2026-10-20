@@ -11,6 +11,10 @@ test('the clinic hub exposes all five visible professions', () => {
     assert.ok(role.icon);
     assert.ok(role.description);
     assert.ok(role.theme);
+    assert.ok(role.manual?.purpose);
+    assert.equal(role.manual?.skills.length, 3);
+    assert.ok(role.manual?.missions);
+    assert.ok(role.hotspot.width > 0 && role.hotspot.height > 0);
   }
 });
 
@@ -75,8 +79,8 @@ test('origin guard admits local Vite only in development and rejects unknown bro
   assert.equal(await requestGuard('development', { referer: 'not a URL' }), 403);
 });
 
-test('the narrow-screen alley stacks profession doors instead of requiring five columns', () => {
+test('the campus replaces the scene with a desktop-only notice below 1024px', () => {
   const css = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
-  assert.match(css, /@media \(max-width: 800px\).*?\.clinic-alley__buildings \{ grid-template-columns: 1fr;/s);
-  assert.match(css, /\.career-door, \.career-door--dietetics \{ min-height: 190px;/);
+  assert.match(css, /@media \(max-width: 1023px\).*?\.campus-scene \{ display: none;/s);
+  assert.match(css, /\.campus-mobile-notice \{ height: 100%; display: grid;/);
 });

@@ -76,6 +76,13 @@ context: []
 | Obsolete hashed build bundles retained | low | The generated `index.html` references only the new hashes; the two obsolete tracked bundles were removed to avoid stale build-artifact accumulation. |
 | Arcade effects have only source-text verification | low | The absence of rendered-DOM coverage is real, but the required smallest fix would introduce a browser-testing harness absent from the repository; existing contracts and specified manual verification remain. Rejected. |
 | Reduced-motion behavior has only source-text verification | low | The stylesheet contract asserts sweep removal and static emphasis; an emulated browser test needs the same out-of-scope harness. Rejected. |
+| Coarse-pointer controls only receive `:active` emphasis | false | The kiosk is desktop-only and the idle frames are continuously visible; a touch press also receives the stronger active frame, so the affordance does not disappear. |
+| Pressed sweep does not settle | low | `:hover`/`:focus-visible` assigns an animation to `::before`, which takes precedence over the active transform; disable that animation during `:active` so the existing press position applies. |
+| Focus pulse is not persistent | false | The bright focus frame, inset focus outline, and halo persist after the deliberately brief emphasis pulse, satisfying the required durable keyboard indicator. |
+| Fixed 7px marker is not proportional | false | The marker lives in the controls’ shared art plane and is intentionally a compact terminal marker; its local pixel size does not move it outside a row or misalign the hit area. |
+| No `:focus-visible` fallback | low | Supporting browsers without `:focus-visible` is a real compatibility gap, but the requested current keyboard route already exposes focus where the selector is supported and the broader fallback is not a direct correction. Rejected. |
+| Negative-z pseudo-elements lack rendered verification | low | The pseudo-elements sit in isolated stacking contexts with transparent controls; an added visual harness would be disproportionate to this localized CSS change. Rejected. |
+| Arcade visuals have only source-text checks | low | The gap is real, but the repository has no browser harness; adding one is not a direct correction to the feature and manual checks are explicitly prescribed. Rejected. |
 
 ## Design Notes
 

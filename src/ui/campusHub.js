@@ -1,21 +1,23 @@
-import { getDoorAction, getRole, ROLES } from '../data/roles.js';
+import { getCampusPanelAction, getDoorAction, getRole, ROLES } from '../data/roles.js';
 import { navigate } from '../main.js';
+import { createPanelRequestGuard, createRetryableLoadCache, isCampusDesktop } from './campusPanelState.js';
 
 const CAMPUS_IMAGE = `${import.meta.env.BASE_URL}assets/campus-hub.png`;
 const MIN_LOADING_MS = 850;
+const campusStateLoads = createRetryableLoadCache((source) => new Promise((resolve, reject) => {
+  const image = new Image();
+  image.addEventListener('load', resolve, { once: true });
+  image.addEventListener('error', () => reject(new Error(source)), { once: true });
+  image.src = source;
+}));
 
-function manualMarkup(role) {
-  const availability = role.unlocked ? 'Parcours disponible' : role.unlockRequirement;
-  return `<button class="campus-panel__back" type="button" data-directory>← Retour au panneau</button><div class="campus-manual"><p class="campus-panel__kicker">${availability}</p><h2>${role.label}</h2><p class="campus-manual__purpose">${role.manual.purpose}</p><h3>Compétences travaillées</h3><ul>${role.manual.skills.map((skill) => `<li>${skill}</li>`).join('')}</ul><h3>Ce qui t’attend</h3><p>${role.manual.missions}</p>${role.unlocked ? '<button class="btn btn--primary campus-manual__enter" data-enter>Entrer dans le parcours</button>' : '<p class="campus-manual__locked">Ce parcours est présenté en avant-première. Les missions arriveront prochainement.</p>'}</div>`;
+function campusStateSource(role) {
+  return `${import.meta.env.BASE_URL}assets/${role.panelAsset}`;
 }
 
-function showManual(panel, roleId) {
-  const role = getRole(roleId);
-  if (!role) return;
-  panel.hidden = false;
-  panel.innerHTML = manualMarkup(role);
-  panel.querySelector('[data-directory]').addEventListener('click', () => { panel.hidden = true; panel.innerHTML = ''; });
-  panel.querySelector('[data-enter]')?.addEventListener('click', () => navigate('levels', { roleId: role.id }));
+function preloadCampusState(role) {
+  const source = campusStateSource(role);
+  return campusStateLoads.load(source);
 }
 
 export function renderCampusLoading(container) {
@@ -29,13 +31,68 @@ export function renderCampusLoading(container) {
 }
 
 export function renderCampusHub(container) {
-  container.innerHTML = `<div class="view campus-shell"><div class="campus-mobile-notice"><span>MedGame est disponible sur PC</span><p>Le campus interactif demande un écran de 1024 px minimum.</p><button class="btn btn--secondary" data-back>Retour à l’accueil</button></div><main class="campus-scene" aria-label="Campus des professions de santé"><img class="campus-scene__image" src="${CAMPUS_IMAGE}" alt="Cour du campus MedGame avec les cinq pôles de santé"><div class="campus-scene__hotspots">${Object.values(ROLES).map((role) => `<button class="campus-hotspot campus-hotspot--${role.theme}" type="button" data-role="${role.id}" aria-label="Entrer dans ${role.label}" style="--left:${role.hotspot.left}%;--top:${role.hotspot.top}%;--width:${role.hotspot.width}%;--height:${role.hotspot.height}%"></button>`).join('')}</div><nav class="campus-directory-hotspots" aria-label="Panneau des métiers">${Object.values(ROLES).map((role, index) => `<button type="button" class="campus-directory-hotspot" data-manual="${role.id}" style="--row:${index}" aria-label="Consulter le manuel ${role.label}"></button>`).join('')}</nav><aside class="campus-panel-detail" aria-live="polite" hidden></aside><button class="campus-scene__exit" type="button" data-back>Quitter le campus</button></main></div>`;
-  const panel = container.querySelector('.campus-panel-detail');
+  const roles = Object.values(ROLES);
+  container.innerHTML = `<div class="view campus-shell"><div class="campus-mobile-notice"><span>MedGame est disponible sur PC</span><p>Le campus interactif demande un écran de 1024 px minimum.</p><button class="btn btn--secondary" data-back>Retour à l’accueil</button></div><main class="campus-scene" aria-label="Campus des professions de santé"><img class="campus-scene__image" src="${CAMPUS_IMAGE}" alt="Cour du campus MedGame avec les cinq pôles de santé">${roles.map((role) => `<div class="campus-kiosk-state" data-state="${role.id}" aria-hidden="true"><img data-src="${campusStateSource(role)}" alt=""></div>`).join('')}<div class="campus-scene__hotspots">${roles.map((role) => `<button class="campus-hotspot campus-hotspot--${role.theme}" type="button" data-role="${role.id}" aria-label="${role.unlocked ? `Entrer dans ${role.label}` : `Prévisualiser le panneau ${role.label}, parcours verrouillé`}" style="--left:${role.hotspot.left}%;--top:${role.hotspot.top}%;--width:${role.hotspot.width}%;--height:${role.hotspot.height}%"></button>`).join('')}</div><nav class="campus-directory-hotspots" aria-label="Panneau des métiers">${roles.map((role, index) => `<button type="button" class="campus-directory-hotspot" data-panel-role="${role.id}" style="--row:${index}" aria-label="Consulter le panneau ${role.label}"></button>`).join('')}</nav><button class="campus-kiosk-return" type="button" data-directory hidden>Retour au panneau</button><button class="campus-kiosk-enter" type="button" data-enter hidden>Entrer dans le parcours Dietetics</button><p class="campus-scene__feedback" aria-live="polite"></p><button class="campus-scene__exit" type="button" data-back>Quitter le campus</button></main></div>`;
+  const directory = container.querySelector('.campus-directory-hotspots');
+  const returnButton = container.querySelector('[data-directory]');
+  const enterButton = container.querySelector('[data-enter]');
+  const feedback = container.querySelector('.campus-scene__feedback');
+  const panelRequests = createPanelRequestGuard();
+  let activeRoleId = null;
+  let activeInvoker = null;
+
+  const setPanelState = (roleId = null) => {
+    activeRoleId = roleId;
+    container.querySelectorAll('[data-state]').forEach((state) => state.classList.toggle('campus-kiosk-state--active', state.dataset.state === roleId));
+    directory.hidden = roleId !== null;
+    returnButton.hidden = roleId === null;
+    enterButton.hidden = roleId !== 'dietetics';
+  };
+
+  const attachStateImage = (role) => {
+    const image = container.querySelector(`[data-state="${role.id}"] img`);
+    if (!image.getAttribute('src')) image.src = image.dataset.src;
+  };
+
+  const openPanel = async (roleId, invoker) => {
+    const action = getCampusPanelAction(roleId);
+    if (!action.roleId) {
+      feedback.textContent = action.feedback;
+      return;
+    }
+    const requestVersion = panelRequests.request();
+    try {
+      const role = getRole(action.roleId);
+      await preloadCampusState(role);
+      if (!panelRequests.isCurrent(requestVersion)) return;
+      attachStateImage(role);
+      activeInvoker = invoker;
+      setPanelState(role.id);
+      feedback.textContent = `Panneau ${role.label} affiché.`;
+      returnButton.focus();
+    } catch {
+      if (!panelRequests.isCurrent(requestVersion)) return;
+      setPanelState(null);
+      feedback.textContent = 'Le panneau demandé ne peut pas être chargé pour le moment.';
+    }
+  };
+
+  if (isCampusDesktop(window.innerWidth)) roles.forEach((role) => { preloadCampusState(role).catch(() => {}); });
   container.querySelectorAll('[data-role]').forEach((door) => door.addEventListener('click', () => {
     const action = getDoorAction(door.dataset.role);
     if (action.roleId) navigate('levels', { roleId: action.roleId });
-    else showManual(panel, door.dataset.role);
+    else openPanel(door.dataset.role, door);
   }));
-  container.querySelectorAll('[data-manual]').forEach((entry) => entry.addEventListener('click', () => showManual(panel, entry.dataset.manual)));
+  container.querySelectorAll('[data-panel-role]').forEach((entry) => entry.addEventListener('click', () => openPanel(entry.dataset.panelRole, entry)));
+  returnButton.addEventListener('click', () => {
+    panelRequests.cancel();
+    setPanelState();
+    feedback.textContent = 'Panneau des métiers affiché.';
+    activeInvoker?.focus();
+    activeInvoker = null;
+  });
+  enterButton.addEventListener('click', () => {
+    if (activeRoleId === 'dietetics') navigate('levels', { roleId: 'dietetics' });
+  });
   container.querySelectorAll('[data-back]').forEach((button) => button.addEventListener('click', () => navigate('menu')));
 }

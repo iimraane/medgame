@@ -27,4 +27,4 @@ En développement, l’API accepte uniquement les origines Vite `http://localhos
 
 ## Campus interactif
 
-Le campus est une expérience desktop : sous 1024 px, l’application affiche un avis indiquant que le jeu est disponible sur PC. L’illustration source est stockée dans `src/public/assets/campus-hub.png` afin que Vite la publie sous `/game/assets/campus-hub.png`. Le bouton **Jouer** la précharge avant d’afficher le hub.
+Le campus est une expérience desktop : sous 1024 px, l’application affiche un avis indiquant que le jeu est disponible sur PC. `src/public/assets/campus-hub.png` est la scène de base, publiée par Vite sous `/game/assets/campus-hub.png`. Les cinq fichiers lossless `campus-panel-*.png` sont des images complètes au même format (1672×941), mais sont superposés et découpés localement au seul kiosque inférieur droit : ils ne doivent jamais être redimensionnés, recompressés ou remplacés par du contenu HTML. Le bouton **Jouer** précharge la scène, puis le hub précharge les états de kiosque.

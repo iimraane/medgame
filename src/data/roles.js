@@ -6,6 +6,7 @@ export const ROLES = {
     icon: '🥕',
     description: 'Explorer les habitudes, les contraintes et des objectifs réalistes, sans prescription personnalisée.',
     theme: 'dietetics',
+    panelAsset: 'campus-panel-dietetics.png',
     unlocked: true,
     hotspot: { left: 2, top: 14, width: 17, height: 50 },
     manual: {
@@ -21,6 +22,7 @@ export const ROLES = {
     icon: '🩺',
     description: 'Observer, orienter et coordonner le parcours de soin.',
     theme: 'general-practice',
+    panelAsset: 'campus-panel-general-practice.png',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
     hotspot: { left: 24, top: 27, width: 14, height: 43 },
@@ -37,6 +39,7 @@ export const ROLES = {
     icon: '🩹',
     description: 'Accompagner, surveiller et soutenir au plus près du quotidien.',
     theme: 'nursing',
+    panelAsset: 'campus-panel-nursing.png',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
     hotspot: { left: 42, top: 34, width: 14, height: 42 },
@@ -53,6 +56,7 @@ export const ROLES = {
     icon: '💬',
     description: 'Écouter avec attention et créer un espace de parole sûr.',
     theme: 'psychology',
+    panelAsset: 'campus-panel-psychology.png',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
     hotspot: { left: 70, top: 34, width: 14, height: 43 },
@@ -69,6 +73,7 @@ export const ROLES = {
     icon: '⚗️',
     description: 'Informer et sécuriser le bon usage des traitements.',
     theme: 'pharmacy',
+    panelAsset: 'campus-panel-pharmacy.png',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
     hotspot: { left: 86, top: 27, width: 14, height: 43 },
@@ -81,6 +86,12 @@ export const ROLES = {
 };
 
 export function getRole(roleId) { return ROLES[roleId]; }
+
+export function getCampusPanelAction(roleId) {
+  const role = getRole(roleId);
+  if (!role?.panelAsset) return { feedback: 'Ce panneau ne peut pas être chargé pour le moment.' };
+  return { roleId: role.id, panelAsset: role.panelAsset };
+}
 
 export function getDoorAction(roleId) {
   const role = getRole(roleId);

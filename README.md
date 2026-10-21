@@ -1,23 +1,23 @@
 # MedGame 🥕
 
-MedGame is a fictional educational simulation. It is not medical advice and never provides patient-specific clinical guidance.
+MedGame is an interactive health role-playing game. It is not medical advice and never provides patient-specific clinical guidance.
 
 ## Current career-mode loop
 
-The shipped role is Dietetics. Choose an unlocked mission, read its objectives and available tools, conduct a respectful AI-patient conversation, then receive a competency debrief. The three missions practise food-history gathering, contextual understanding, communication, and safe/realistic planning. The safety-boundary mission requires an explicit orientation action; factual language alone cannot award mastery. Missions can be replayed without losing the best recorded result.
+The shipped role is Dietetics. Its ten-mission campaign moves from everyday food history to complex contextual consultations. Choose an unlocked mission, use optional in-world observations, conduct a respectful AI-patient conversation, then receive a competency debrief. Case facts, safety gates and scoring remain server-side; later safety-bound consultations require a server-recorded support step before mastery. Missions can be replayed without losing the best recorded result.
 
 Case constraints, scoring rubrics, and evaluation logic remain server-side. If verified evaluation is unavailable, the client shows a non-mastering fallback rather than inventing a score.
 
 ## Local setup
 
-Requires Node.js 18+ and `OPENAI_API_KEY` in `.env` for AI conversation.
+Requires Node.js 18+ and `OPENAI_API_KEY` in `.env` for AI conversation. `OPENAI_MODEL` is optional and defaults to `gpt-5.6-luna`; it can be overridden for an account-supported Chat Completions model. This role-playing game is non-diagnostic and never provides individualized advice.
 
 ```bash
 npm install
 npm run start
 ```
 
-Open `http://localhost:5173`. Run `npm run build` for a production bundle and `node --test tests/engine.test.js tests/storage.test.js` for the focused test suite.
+Open `http://localhost:5173`. Run `npm run build` for a production bundle and `node --test tests/engine.test.js tests/storage.test.js tests/roles.test.js tests/campaign.test.js` for the focused test suite.
 
 ## Clinique des parcours
 

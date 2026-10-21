@@ -19,7 +19,7 @@ export function generatePatient(level) {
         .map((m) => `- ${m.categoryLabel}: ${m.name} → ${m.prompt}`)
         .join('\n');
 
-    const prompt = `Tu es un patient dans un jeu de simulation médicale. Tu simules une consultation chez le médecin.
+    const prompt = `Tu es un patient dans un jeu de rôle santé. Tu participes à une consultation avec le joueur.
 
 🏥 TON IDENTITÉ :
 - Nom : ${name.fullName}

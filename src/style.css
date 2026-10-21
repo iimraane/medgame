@@ -513,12 +513,24 @@ a {
 .mission-briefing { max-width: 720px; margin: 42px auto; padding: 32px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); }
 .mission-briefing h1 { margin: 8px 0; }.mission-briefing h2 { font-size: 1rem; margin-top: 24px; }.mission-briefing li { margin: 8px 0; }
 .mission-briefing__boundary { padding: 12px; border-left: 4px solid var(--green-500); background: var(--green-50); }
-.career-chat .chat__body { display: grid; grid-template-columns: 250px minmax(0, 1fr); flex: 1; overflow: hidden; }
-.mission-objectives { padding: 22px; background: var(--bg-card); border-right: 1px solid var(--border); }.mission-objectives h2 { font-size: 1rem; }.mission-objectives li { margin: 10px 0; font-size: .9rem; }
-.career-chat__actions { display:flex; gap:8px; margin-top:8px; }.career-chat__actions .btn { padding: 9px 12px; }
+.career-chat { position: relative; }
+.career-chat .chat__body { display: grid; grid-template-columns: 250px minmax(0, 1fr); flex: 1; min-height: 0; overflow: hidden; }
+.career-chat__debrief-loading { position: absolute; z-index: 30; inset: 0; display: grid; place-items: center; background: rgba(7, 20, 35, .78); backdrop-filter: blur(8px); color: #f3fbff; text-align: center; }
+.career-chat__debrief-loading[hidden] { display: none; }
+.career-chat__debrief-loading > div { display: grid; justify-items: center; gap: 10px; padding: 34px 46px; border: 1px solid rgba(136, 230, 255, .4); border-radius: 20px; background: linear-gradient(145deg, rgba(28, 76, 108, .92), rgba(13, 34, 58, .94)); box-shadow: 0 0 45px rgba(71, 203, 237, .2); }
+.career-chat__debrief-loading p { margin: 0; font-size: 1.1rem; font-weight: 800; }.career-chat__debrief-loading small { color: #bbd6e5; }
+.career-chat__debrief-spinner { width: 38px; height: 38px; border: 3px solid rgba(197, 246, 255, .25); border-top-color: #7decff; border-radius: 50%; animation: debrief-spin .85s linear infinite; }
+@keyframes debrief-spin { to { transform: rotate(360deg); } }
+.observations-rail { padding: 22px; background: var(--bg-card); border-right: 1px solid var(--border); }.observations-rail h2 { font-size: 1rem; }.observations-rail p { font-size: .9rem; }.observation-tool { width: 100%; margin: 8px 0; text-align: left; }.observation-tool__empty { color: var(--text-secondary); }.message--observation .message__bubble { background: var(--green-50); border: 1px solid var(--green-500); }
+.career-chat__composer { display: flex; align-items: stretch; gap: 8px; width: 100%; }
+.career-chat__composer .chat__input { min-width: 0; flex: 1; }
+.career-chat__voice { width: 48px; flex: 0 0 48px; border: 1.5px solid var(--border); border-radius: var(--radius-lg); color: var(--blue-700); background: var(--gray-50); cursor: pointer; transition: background var(--transition), border-color var(--transition), transform var(--transition); }
+.career-chat__voice:hover, .career-chat__voice:focus-visible { background: var(--blue-50); border-color: var(--blue-400); transform: translateY(-1px); outline: none; }
+.career-chat__voice svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.career-chat__actions { display:flex; justify-content: flex-end; gap:8px; margin-top:8px; }.career-chat__actions .btn { padding: 9px 12px; }
 .debrief { max-width: 680px; margin: 48px auto; padding: 34px; background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); }
-.debrief__axis { display:grid; grid-template-columns: 1fr auto; gap: 8px; margin: 18px 0; }.debrief__axis > div { grid-column: 1 / -1; height: 9px; background: var(--gray-200); border-radius: 99px; overflow:hidden; }.debrief__axis i { display:block; height:100%; background: linear-gradient(90deg, var(--green-500), var(--blue-500)); }.debrief__feedback { margin: 28px 0; padding: 18px; background: var(--blue-50); border-radius: var(--radius-md); }
-@media (max-width: 800px) { .career-chat .chat__body { grid-template-columns: 1fr; }.mission-objectives { display:none; }.mission-briefing, .debrief { margin: 18px; }.career-hub { padding: 14px 10px; }.clinic-alley { min-height: auto; padding: 16px 14px; overflow: visible; }.clinic-alley__sky, .clinic-alley__path { display: none; }.clinic-alley__buildings { grid-template-columns: 1fr; min-height: 0; gap: 12px; }.career-door, .career-door--dietetics { min-height: 190px; }.career-door::after { inset: 28% 35% 14%; }.career-door__window { top: 14px; width: 25%; height: 40px; }.career-door__description { min-height: auto; max-width: 34rem; } }
+.debrief__axis { display:grid; grid-template-columns: 1fr auto; gap: 8px; margin: 18px 0; }.debrief__axis > div { grid-column: 1 / -1; height: 9px; background: var(--gray-200); border-radius: 99px; overflow:hidden; }.debrief__axis i { display:block; height:100%; background: linear-gradient(90deg, var(--green-500), var(--blue-500)); }.debrief__advancement { margin: 10px 0 22px; padding: 10px 13px; border-left: 4px solid var(--blue-500); border-radius: var(--radius-sm); background: var(--blue-50); color: var(--text-secondary); font-weight: 700; }.debrief__advancement--success { border-left-color: var(--green-500); background: var(--green-50); color: var(--green-700); }.debrief__feedback { margin: 28px 0; padding: 18px; background: var(--blue-50); border-radius: var(--radius-md); }
+@media (max-width: 800px) { .career-chat .chat__body { grid-template-columns: 1fr; }.observations-rail { display:none; }.mission-briefing, .debrief { margin: 18px; }.career-hub { padding: 14px 10px; }.clinic-alley { min-height: auto; padding: 16px 14px; overflow: visible; }.clinic-alley__sky, .clinic-alley__path { display: none; }.clinic-alley__buildings { grid-template-columns: 1fr; min-height: 0; gap: 12px; }.career-door, .career-door--dietetics { min-height: 190px; }.career-door::after { inset: 28% 35% 14%; }.career-door__window { top: 14px; width: 25%; height: 40px; }.career-door__description { min-height: auto; max-width: 34rem; } }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; } }
 
@@ -619,12 +631,14 @@ a {
 
 .chat__messages-area {
     flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
 }
 
 .chat__messages {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: 20px 24px;
     display: flex;
@@ -668,6 +682,11 @@ a {
 
 .message--patient {
     align-self: flex-start;
+}
+
+.message__cue {
+    color: var(--text-secondary);
+    font-style: italic;
 }
 
 .message__bubble {

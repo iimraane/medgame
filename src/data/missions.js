@@ -1,9 +1,16 @@
-// Client-safe mission metadata only. Case constraints, rubrics and patient truth live in server/missions.js.
+// Browser-safe campaign cards. Facts, scoring, safety gates and observations stay on the server.
 export const COMPETENCY_AXES = ['foodHistory', 'context', 'communication', 'safePlan'];
 export const MISSIONS = [
-  { id: 'dietetics-everyday-constraints', roleId: 'dietetics', order: 1, title: 'Contraintes du quotidien', icon: '🛒', summary: 'Construire un échange alimentaire adapté à une vraie semaine.', objectives: ['Recueillir l’histoire alimentaire', 'Explorer le budget, le rythme et les préférences', 'Co-construire une prochaine étape réaliste'], permittedTools: ['Questions d’histoire alimentaire', 'Planificateur d’objectif'], safetyBoundary: null },
-  { id: 'dietetics-habit-follow-up', roleId: 'dietetics', order: 2, title: 'Suivi durable', icon: '🌱', summary: 'Soutenir l’adhésion et ajuster un plan sans poursuivre la perfection.', objectives: ['Identifier ce qui a été praticable', 'Comprendre les freins sans jugement', 'Co-construire un objectif plus petit et durable'], permittedTools: ['Questions de suivi', 'Planificateur d’objectif'], safetyBoundary: null },
-  { id: 'dietetics-safety-orientation', roleId: 'dietetics', order: 3, title: 'Limite de sécurité', icon: '🧭', summary: 'Reconnaître quand l’accompagnement nutritionnel doit laisser place à une orientation adaptée.', objectives: ['Répondre avec respect', 'Reconnaître la limite de sécurité', 'Proposer une orientation ou une escalade adaptée'], permittedTools: ['Orientation sécurité'], safetyBoundary: { requiredAction: 'orientation', explanation: 'Cette mission requiert une orientation vers un soutien approprié.' } },
-];
+  ['dietetics-rhythm-overflow', 'Le rythme qui déborde', '🕒', 'Une semaine pressée, entre repas, collations et boissons.'],
+  ['dietetics-afternoon-dip', 'Le creux de l’après-midi', '🥤', 'Explorer la faim, le rassasiement et les habitudes du quotidien.'],
+  ['dietetics-false-start', 'Après le faux départ', '🌱', 'Reprendre après un essai qui n’a pas tenu dans la vraie vie.'],
+  ['dietetics-under-pressure', 'Manger sous pression', '💬', 'Faire de la place au stress, aux écrans et aux repas partagés.'],
+  ['dietetics-vegetarian-everyday', 'Choix végétariens au quotidien', '🥕', 'Composer avec variété, organisation et contraintes pratiques.'],
+  ['dietetics-worrying-checkup', 'Le bilan qui inquiète', '📋', 'Mettre en contexte une prévention et coordonner avec soin.'],
+  ['dietetics-shift-rhythm', 'Rythme décalé', '🌙', 'Comprendre une alimentation qui suit des horaires changeants.'],
+  ['dietetics-weight-real-life', 'Objectif de poids, vraie vie', '⚖️', 'Accueillir préférences, activité et changement progressif.'],
+  ['dietetics-eating-difficult', 'Quand manger devient difficile', '🧭', 'Une consultation délicate qui appelle une attention respectueuse.'],
+  ['dietetics-incomplete-file', 'Le dossier incomplet', '🧩', 'Avancer prudemment parmi plusieurs contextes qui se croisent.'],
+].map(([id, title, icon, summary], index) => ({ id, roleId: 'dietetics', order: index + 1, title, icon, summary }));
 export function getMission(id) { return MISSIONS.find((mission) => mission.id === id); }
 export function getMissionsForRole(roleId) { return MISSIONS.filter((mission) => mission.roleId === roleId); }

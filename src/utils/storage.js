@@ -18,10 +18,20 @@ const DEFAULT_SETTINGS = {
 
 export function migrateSave(raw) {
     const legacy = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    const oldProgress = sanitizeMissionProgress(legacy.missionProgress);
+    const migratedProgress = oldProgress && Object.keys(oldProgress).length ? oldProgress : (legacy.maxUnlockedLevel > 1 ? { 'dietetics-rhythm-overflow': { attempts: 1, bestScore: 0, mastered: false } } : {});
+    for (const oldId of ['dietetics-everyday-constraints', 'dietetics-habit-follow-up', 'dietetics-safety-orientation']) {
+        if (migratedProgress[oldId]) {
+            const prior = migratedProgress['dietetics-rhythm-overflow'] || { attempts: 0, bestScore: 0, mastered: false };
+            const legacyEntry = migratedProgress[oldId];
+            migratedProgress['dietetics-rhythm-overflow'] = { attempts: prior.attempts + legacyEntry.attempts, bestScore: Math.max(prior.bestScore, legacyEntry.bestScore), mastered: prior.mastered || legacyEntry.mastered, ...((legacyEntry.lastResult || prior.lastResult) ? { lastResult: legacyEntry.lastResult || prior.lastResult } : {}) };
+            delete migratedProgress[oldId];
+        }
+    }
     return {
         ...DEFAULT_SAVE, ...legacy,
         selectedRole: legacy.selectedRole || 'dietetics',
-        missionProgress: sanitizeMissionProgress(legacy.missionProgress) || (legacy.maxUnlockedLevel > 1 ? { 'dietetics-everyday-constraints': { attempts: 1, bestScore: 0, mastered: false } } : {}),
+        missionProgress: migratedProgress,
         scores: legacy.scores && typeof legacy.scores === 'object' ? legacy.scores : {},
         unlockedCards: Array.isArray(legacy.unlockedCards) ? legacy.unlockedCards : [],
     };

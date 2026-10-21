@@ -68,7 +68,7 @@ export function renderSettings(container) {
           <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6">
             <strong>MedGame</strong> v2.0 — Jeu de simulation de consultations médicales.<br>
             Les patients sont générés par IA (GPT-4o-mini) avec des personnalités et pathologies aléatoires.<br>
-            Ce jeu est à but éducatif et ludique, il ne remplace en aucun cas un avis médical.
+            MedGame ne remplace en aucun cas un avis médical.
           </p>
         </div>
 

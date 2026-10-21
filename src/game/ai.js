@@ -45,10 +45,17 @@ export async function guessDiagnosis(sessionId, guessedConditionId) {
     return data;
 }
 
-export async function evaluateMission(sessionId, actions = []) {
+export async function evaluateMission(sessionId) {
     const res = await fetch(`${API_BASE}/evaluate`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, actions }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }),
     });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+}
+
+export async function requestScreening(sessionId, screeningId) {
+    const res = await fetch(`${API_BASE}/screening`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, screeningId }) });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     return data;

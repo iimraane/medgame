@@ -1,12 +1,14 @@
 // ─── Storage Manager ─────────────────────────────────────────────
 // Handles all localStorage operations for game progress and settings.
 
+import { getMissionsForRole } from '../data/missions.js';
+
 const STORAGE_KEY = 'medgame_save';
 const SETTINGS_KEY = 'medgame_settings';
 
 export const DEFAULT_SAVE = {
     currentLevel: 1, maxUnlockedLevel: 1, scores: {}, unlockedCards: [], firstTime: true,
-    selectedRole: 'dietetics', missionProgress: {},
+    selectedRole: 'dietetics', missionProgress: {}, campaignProgressVersion: 1, legacyCampaignUnlockThrough: 1,
 };
 
 const DEFAULT_SETTINGS = {
@@ -19,7 +21,9 @@ const DEFAULT_SETTINGS = {
 export function migrateSave(raw) {
     const legacy = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
     const oldProgress = sanitizeMissionProgress(legacy.missionProgress);
-    const migratedProgress = oldProgress && Object.keys(oldProgress).length ? oldProgress : (legacy.maxUnlockedLevel > 1 ? { 'dietetics-rhythm-overflow': { attempts: 1, bestScore: 0, mastered: false } } : {});
+    const migratedProgress = oldProgress && Object.keys(oldProgress).length ? oldProgress : {};
+    const campaignMissions = getMissionsForRole('dietetics');
+    const hasCampaignProgress = campaignMissions.some((mission) => migratedProgress[mission.id]);
     for (const oldId of ['dietetics-everyday-constraints', 'dietetics-habit-follow-up', 'dietetics-safety-orientation']) {
         if (migratedProgress[oldId]) {
             const prior = migratedProgress['dietetics-rhythm-overflow'] || { attempts: 0, bestScore: 0, mastered: false };
@@ -28,10 +32,15 @@ export function migrateSave(raw) {
             delete migratedProgress[oldId];
         }
     }
+    const storedLegacyBoundary = Number.isFinite(legacy.legacyCampaignUnlockThrough) ? Math.floor(legacy.legacyCampaignUnlockThrough) : null;
+    const inferredLegacyBoundary = Number.isFinite(legacy.maxUnlockedLevel) ? Math.floor(legacy.maxUnlockedLevel) : 1;
+    const legacyCampaignUnlockThrough = Math.max(1, Math.min(campaignMissions.length, storedLegacyBoundary ?? (hasCampaignProgress ? 1 : inferredLegacyBoundary)));
     return {
         ...DEFAULT_SAVE, ...legacy,
         selectedRole: legacy.selectedRole || 'dietetics',
         missionProgress: migratedProgress,
+        campaignProgressVersion: 1,
+        legacyCampaignUnlockThrough,
         scores: legacy.scores && typeof legacy.scores === 'object' ? legacy.scores : {},
         unlockedCards: Array.isArray(legacy.unlockedCards) ? legacy.unlockedCards : [],
     };
@@ -48,7 +57,12 @@ function sanitizeMissionProgress(value) {
 }
 
 export function loadSave() {
-    try { const raw = localStorage.getItem(STORAGE_KEY); return migrateSave(raw ? JSON.parse(raw) : {}); }
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY); const parsed = raw ? JSON.parse(raw) : {};
+        const save = migrateSave(parsed);
+        if (raw && (parsed.campaignProgressVersion !== save.campaignProgressVersion || parsed.legacyCampaignUnlockThrough !== save.legacyCampaignUnlockThrough)) localStorage.setItem(STORAGE_KEY, JSON.stringify(save));
+        return save;
+    }
     catch { return migrateSave({}); }
 }
 
@@ -68,6 +82,7 @@ export function recordMissionResult(missionId, result) {
 
 export function isMissionUnlocked(mission, missions, save = loadSave()) {
     if (mission.order === 1) return true;
+    if (mission.order <= (save.legacyCampaignUnlockThrough || 1)) return true;
     const previous = missions.find((item) => item.roleId === mission.roleId && item.order === mission.order - 1);
     return Boolean(previous && save.missionProgress[previous.id]?.mastered);
 }
@@ -92,9 +107,15 @@ export function resetAll() {
     document.cookie = 'medgame_active=; max-age=0; path=/';
 }
 
-export function unlockAllLevels() {
+export function unlockAllLevels(missionIds = getMissionsForRole('dietetics').map((mission) => mission.id)) {
     const save = loadSave();
-    save.maxUnlockedLevel = 20; // 20 is the max level
+    const knownMissionIds = new Set(getMissionsForRole('dietetics').map((mission) => mission.id));
+    save.maxUnlockedLevel = knownMissionIds.size;
+    save.legacyCampaignUnlockThrough = knownMissionIds.size;
+    for (const missionId of new Set(missionIds.filter((id) => knownMissionIds.has(id)))) {
+        const prior = save.missionProgress[missionId] || { attempts: 0, bestScore: 0, mastered: false };
+        save.missionProgress[missionId] = { ...prior, mastered: true };
+    }
     save.firstTime = false;
     saveSave(save);
     return save;

@@ -8,7 +8,7 @@ const { getMissionsForRole } = await import('../src/data/missions.js');
 
 test('legacy saves migrate without discarding existing progress', () => {
   const migrated = storage.migrateSave({ maxUnlockedLevel: 7, scores: { 2: { score: 100 } }, unlockedCards: ['rhume'] });
-  assert.equal(migrated.maxUnlockedLevel, 7); assert.deepEqual(migrated.unlockedCards, ['rhume']); assert.equal(migrated.missionProgress['dietetics-rhythm-overflow'].attempts, 1);
+  assert.equal(migrated.maxUnlockedLevel, 7); assert.deepEqual(migrated.unlockedCards, ['rhume']); assert.equal(migrated.legacyCampaignUnlockThrough, 7); assert.equal(migrated.missionProgress['dietetics-rhythm-overflow'], undefined);
 });
 test('prior dietetics mission progress is retained on the first campaign case', () => {
   const lastResult = { total: 82, mastery: true };
@@ -26,6 +26,31 @@ test('retry retains the best score and increments attempts', () => {
 test('mission unlocks after the preceding mission is attempted', () => {
   storage.resetAll(); const missions = getMissionsForRole('dietetics'); assert.equal(storage.isMissionUnlocked(missions[1], missions), false);
   storage.recordMissionResult(missions[0].id, { total: 75, mastery: true }); assert.equal(storage.isMissionUnlocked(missions[1], missions), true);
+});
+test('administrator unlock records campaign progress for every Dietetics mission', () => {
+  storage.resetAll(); const missions = getMissionsForRole('dietetics');
+  const save = storage.unlockAllLevels();
+  assert.equal(save.maxUnlockedLevel, missions.length);
+  assert.equal(missions.every((mission) => save.missionProgress[mission.id]?.mastered), true);
+  assert.equal(missions.every((mission) => storage.isMissionUnlocked(mission, missions, save)), true);
+  storage.resetAll(); const reset = storage.loadSave();
+  assert.equal(storage.isMissionUnlocked(missions[0], missions, reset), true);
+  assert.equal(storage.isMissionUnlocked(missions[1], missions, reset), false);
+});
+test('legacy numeric progression remains readable by the campaign map', () => {
+  const missions = getMissionsForRole('dietetics'); const save = storage.migrateSave({ maxUnlockedLevel: 4 });
+  assert.equal(storage.isMissionUnlocked(missions[3], missions, save), true);
+  assert.equal(storage.isMissionUnlocked(missions[4], missions, save), false);
+  const laterSave = storage.migrateSave({ maxUnlockedLevel: 7 });
+  assert.equal(storage.isMissionUnlocked(missions[6], missions, laterSave), true);
+  assert.equal(storage.isMissionUnlocked(missions[7], missions, laterSave), false);
+});
+test('legacy counters never override authoritative campaign progress', () => {
+  const missions = getMissionsForRole('dietetics');
+  const save = storage.migrateSave({ maxUnlockedLevel: 8, missionProgress: { [missions[0].id]: { attempts: 1, bestScore: 20, mastered: false } } });
+  assert.equal(save.legacyCampaignUnlockThrough, 1);
+  assert.equal(save.missionProgress[missions[0].id].mastered, false);
+  assert.equal(storage.isMissionUnlocked(missions[1], missions, save), false);
 });
 test('malformed mission progress entries are repaired before recording', () => {
   storage.saveSave({ missionProgress: { broken: { attempts: 'many', bestScore: null, mastered: 'yes' } } });

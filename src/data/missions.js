@@ -1,4 +1,4 @@
-// Browser-safe campaign cards. Facts, scoring, safety gates and observations stay on the server.
+// Browser-safe campaign cards. Case details, scoring and safety gates stay on the server.
 export const COMPETENCY_AXES = ['foodHistory', 'context', 'communication', 'safePlan'];
 export const MISSIONS = [
   ['dietetics-rhythm-overflow', 'Le rythme qui déborde', '🕒', 'Une semaine pressée, entre repas, collations et boissons.'],

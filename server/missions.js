@@ -1,61 +1,71 @@
-const AXES = ['foodHistory', 'context', 'communication', 'safePlan'];
-// A level is unlocked only when the overall score is strictly above this value.
-export const MASTERY_THRESHOLD = 70;
-const ARCHETYPES = ['flagrant', 'subtle', 'mixed', 'contextual'];
-const rows = [
-  ['dietetics-rhythm-overflow', 'Nora', 31, 'Je viens parce que mes journées entre rendez-vous me font manger sur le trajet. J’aimerais trouver une organisation qui tienne vraiment.', ['Les journées de Nora alternent transports et rendez-vous.', 'Elle prépare rarement son repas la veille.'], ['Une pause est souvent remplacée par une boisson.', 'Les fins de journée sont imprévisibles.'], ['Journal de rythme', 'Repères de boissons']],
-  ['dietetics-afternoon-dip', 'Malik', 38, 'Je viens parce que mon énergie varie beaucoup l’après-midi. J’aimerais comprendre ce qui se passe pour me sentir plus stable.', ['Malik travaille assis devant un écran.', 'Ses horaires de déjeuner changent selon les réunions.'], ['Les heures de repas changent selon les journées.', 'Certaines boissons accompagnent le travail.'], ['Repères de timing', 'Journal de boissons']],
-  ['dietetics-false-start', 'Élise', 44, 'Je viens parce que ma dernière routine n’a pas tenu. J’aimerais repartir sur quelque chose de possible dans ma vraie vie.', ['Élise vit avec deux enfants et organise les repas du foyer.', 'La semaine et le week-end ont des rythmes différents.'], ['Une ancienne règle était difficile à suivre.', 'Les week-ends ne ressemblent pas aux jours travaillés.'], ['Comparer les routines', 'Carnet de prochaine étape']],
-  ['dietetics-under-pressure', 'Rayan', 27, 'Je viens parce que sous pression, mes repas deviennent automatiques. J’aimerais arrêter de subir ces moments.', ['Rayan alterne télétravail et repas avec des amis.', 'Le soir, les écrans restent souvent allumés pendant le repas.'], ['Les repas partagés sont variables.', 'La pression change les horaires.'], ['Carte des contextes', 'Repères de situation']],
-  ['dietetics-vegetarian-everyday', 'Camille', 34, 'Je viens parce que je mange végétarien mais je manque d’idées quand tout va vite. J’aimerais me sentir plus serein·e au quotidien.', ['Camille fait des courses une fois par semaine.', 'Les repas sont partagés avec une personne aux préférences différentes.'], ['Les courses se font avec peu de temps.', 'Les repas sont préparés pour plusieurs personnes.'], ['Composition d’un repas', 'Contexte des courses']],
-  ['dietetics-worrying-checkup', 'Farid', 49, 'Je viens parce qu’un bilan m’a préoccupé. J’aimerais savoir comment avancer sans faire n’importe quoi.', ['Farid a un suivi médical prévu dans les prochaines semaines.', 'Il connaît des antécédents de suivi chez un proche.'], ['Un proche a eu des suivis médicaux.', 'Un rendez-vous de suivi est déjà envisagé.'], ['Contexte familial', 'Repère de coordination']],
-  ['dietetics-shift-rhythm', 'Ana', 36, 'Je viens parce que mes rotations font bouger tous mes horaires de repas. J’aimerais trouver des repères malgré ce rythme.', ['Ana travaille selon des postes de jour et de nuit.', 'Son sommeil est irrégulier après une série de nuits.'], ['Les nuits et les jours ne se ressemblent pas.', 'La fatigue varie beaucoup.'], ['Chronologie d’une journée', 'Repère fatigue et rythme']],
-  ['dietetics-weight-real-life', 'Sofia', 41, 'Je viens parce que je veux prendre soin de mon bien-être sans que tout se résume à mon poids. J’aimerais être écoutée autrement.', ['Sofia apprécie marcher mais son temps libre change chaque semaine.', 'Des remarques passées ont rendu certains échanges difficiles.'], ['Le mouvement dépend de l’énergie et du temps.', 'Certaines remarques ont été difficiles à vivre.'], ['Contexte multidimensionnel', 'Repère de but partagé']],
-  ['dietetics-eating-difficult', 'Noa', 20, 'Je viens parce que manger prend beaucoup de place dans ma tête en ce moment. J’aimerais que ça cesse de m’envahir.', ['Noa est étudiant·e et vit en colocation.', 'Un proche connaît une partie de la difficulté actuelle.'], ['Parfois, les repas sont évités et cela prend beaucoup de place.', 'La personne ne se sent pas seule pour autant.'], ['Observation du vécu', 'Point de soutien']],
-  ['dietetics-incomplete-file', 'Jules', 52, 'Je viens parce que plusieurs contraintes se mélangent et je ne sais plus quoi prioriser. J’aimerais retrouver un peu de clarté.', ['Jules vit seul et gère des horaires instables.', 'Il prend des traitements prescrits et ressent une fatigue variable.'], ['Les courses, la fatigue et les traitements occupent l’esprit.', 'Des ressources autour de la personne sont irrégulières.'], ['Repère ressources', 'Repère traitements et quotidien', 'Coordination du contexte']],
-];
+import fs from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-function presentation(opening, baselineFacts, facts, screens) {
-  const releaseMap = Object.fromEntries(screens.map((screen, index) => [screen.id, facts[index] || 'Cette observation ajoute un élément de contexte.']));
-  return {
-    flagrant: { opening: `${opening} Je peux déjà vous dire que cela se voit surtout dans mes journées.`, baselineFacts, releaseMap: Object.fromEntries(Object.entries(releaseMap).map(([id, fact]) => [id, `Je vous le dis assez directement : ${fact}`])) },
-    subtle: { opening: `${opening} Je ne sais pas trop quoi ajouter au début.`, baselineFacts, releaseMap: Object.fromEntries(Object.entries(releaseMap).map(([id, fact]) => [id, `Avec cette observation, je peux préciser : ${fact}`])) },
-    mixed: { opening: `${opening} Il y a une partie facile à raconter, et une autre que j’aborde moins spontanément.`, baselineFacts, releaseMap: Object.fromEntries(Object.entries(releaseMap).map(([id, fact], index) => [id, index ? `Je n’y pensais pas tout de suite, mais ${fact.toLowerCase()}` : fact])) },
-    contextual: { opening: `${opening} Cela dépend beaucoup de ce qui se passe autour de moi.`, baselineFacts, releaseMap: Object.fromEntries(Object.entries(releaseMap).map(([id, fact]) => [id, `Dans ce contexte, ${fact.toLowerCase()}`])) },
-  };
+export const MASTERY_THRESHOLD = 70;
+const AXES = ['foodHistory', 'context', 'communication', 'safePlan'];
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ASSET_DIR = join(__dirname, '..', 'src', 'public', 'assets', 'dietetics');
+
+// Server-only whitelist: a browser can receive only these supplied static files.
+const ASSETS = Object.freeze({
+  'meal-a1-rushed-breakfast': 'meal-a1-rushed-breakfast.png', 'meal-a2-train-snack': 'meal-a2-train-snack.png', 'meal-a3-desk-lunch': 'meal-a3-desk-lunch.png', 'meal-a4-afternoon-pause': 'meal-a4-afternoon-pause.png', 'meal-a5-late-dinner': 'meal-a5-late-dinner.png',
+  'meal-b1-family-table': 'meal-b1-family-table.png', 'meal-b2-leftover-box': 'meal-b2-leftover-box.png', 'meal-b3-vegetarian-fast': 'meal-b3-vegetarian-fast.png', 'meal-b4-social-takeaway': 'meal-b4-social-takeaway.png', 'meal-b5-weekend-brunch': 'meal-b5-weekend-brunch.png',
+  'meal-c1-careful-lunch': 'meal-c1-careful-lunch.png', 'meal-c2-night-shift': 'meal-c2-night-shift.png', 'meal-c3-grazing-evening': 'meal-c3-grazing-evening.png', 'meal-c4-restaurant-choice': 'meal-c4-restaurant-choice.png', 'meal-c5-active-day': 'meal-c5-active-day.png',
+  'meal-d1-student-kitchen': 'meal-d1-student-kitchen.jpg', 'meal-d2-quiet-breakfast': 'meal-d2-quiet-breakfast.jpg', 'meal-d3-busy-caregiver': 'meal-d3-busy-caregiver.jpg', 'meal-d4-limited-shopping': 'meal-d4-limited-shopping.jpg', 'meal-d5-uncertain-evening': 'meal-d5-uncertain-evening.jpg',
+});
+const ASSET_NOTES = Object.freeze({
+  'meal-a1-rushed-breakfast': 'Le premier repas semble avoir été pris rapidement avant de partir.', 'meal-a2-train-snack': 'Une collation est consommée pendant un déplacement.', 'meal-a3-desk-lunch': 'Le déjeuner est pris près du poste de travail.', 'meal-a4-afternoon-pause': 'Une pause de l’après-midi associe boisson et petite collation.', 'meal-a5-late-dinner': 'Le repas du soir est préparé tard après une journée longue.',
+  'meal-b1-family-table': 'Le repas du soir est partagé et organisé pour plusieurs personnes.', 'meal-b2-leftover-box': 'Un repas est préparé à partir de restes pour le lendemain.', 'meal-b3-vegetarian-fast': 'Un repas végétarien rapide est préparé avec peu de temps.', 'meal-b4-social-takeaway': 'Le repas est commandé et partagé dans un contexte social.', 'meal-b5-weekend-brunch': 'Le rythme du week-end diffère du rythme des jours travaillés.',
+  'meal-c1-careful-lunch': 'Le repas est très structuré et préparé avec prudence.', 'meal-c2-night-shift': 'La pause repas survient pendant un horaire de nuit.', 'meal-c3-grazing-evening': 'La soirée comporte plusieurs prises alimentaires espacées.', 'meal-c4-restaurant-choice': 'Un repas pris à l’extérieur dépend du contexte social.', 'meal-c5-active-day': 'Le repas est emporté pour une journée aux horaires changeants.',
+  'meal-d1-student-kitchen': 'Le repas dépend d’une cuisine partagée et de moyens limités.', 'meal-d2-quiet-breakfast': 'Le premier repas de la journée reste très modeste.', 'meal-d3-busy-caregiver': 'La préparation est morcelée entre plusieurs responsabilités.', 'meal-d4-limited-shopping': 'Les produits disponibles proviennent d’achats pratiques et limités.', 'meal-d5-uncertain-evening': 'Le repas du soir s’inscrit dans un quotidien chargé et incertain.',
+});
+const TOOL_DEFINITIONS = [
+  { id: 'gallery', label: 'Galerie de repas', unlockOrder: 2, kind: 'gallery' },
+  { id: 'rhythm-journal', label: 'Journal de rythme', unlockOrder: 4, kind: 'journal' },
+  { id: 'shopping-receipt', label: 'Ticket de courses', unlockOrder: 6, kind: 'receipt' },
+  { id: 'pantry-fridge', label: 'Garde-manger & réfrigérateur', unlockOrder: 8, kind: 'pantry' },
+  { id: 'constraints-calendar', label: 'Calendrier des contraintes', unlockOrder: 10, kind: 'calendar' },
+];
+const frames = [
+  ['dietetics-rhythm-overflow', 'Le rythme qui déborde', ['repas pris entre deux déplacements', 'préparation la veille rarement possible', 'fin de journée imprévisible'], ['meal-a1-rushed-breakfast', 'meal-a2-train-snack']],
+  ['dietetics-afternoon-dip', 'Le creux de l’après-midi', ['déjeuner décalé par les réunions', 'longues périodes devant un écran', 'boissons qui accompagnent le travail'], ['meal-a3-desk-lunch', 'meal-a4-afternoon-pause']],
+  ['dietetics-false-start', 'Après le faux départ', ['ancienne règle trop rigide', 'organisation familiale changeante', 'week-ends très différents'], ['meal-b1-family-table', 'meal-b2-leftover-box']],
+  ['dietetics-under-pressure', 'Manger sous pression', ['pression qui modifie les horaires', 'écrans présents au repas', 'repas sociaux variables'], ['meal-b4-social-takeaway', 'meal-c3-grazing-evening']],
+  ['dietetics-vegetarian-everyday', 'Choix végétariens au quotidien', ['courses rapides une fois par semaine', 'repas partagés aux préférences diverses', 'peu de temps le soir'], ['meal-b3-vegetarian-fast', 'meal-b2-leftover-box']],
+  ['dietetics-worrying-checkup', 'Le bilan qui inquiète', ['bilan récent source de questions', 'rendez-vous de suivi déjà prévu', 'antécédents dans l’entourage'], ['meal-c1-careful-lunch', 'meal-c4-restaurant-choice']],
+  ['dietetics-shift-rhythm', 'Rythme décalé', ['alternance de postes de jour et de nuit', 'sommeil variable après les nuits', 'pauses parfois écourtées'], ['meal-c2-night-shift', 'meal-c5-active-day']],
+  ['dietetics-weight-real-life', 'Objectif de poids, vraie vie', ['remarques passées difficiles', 'énergie et temps libre changeants', 'activité quotidienne non linéaire'], ['meal-c5-active-day', 'meal-c4-restaurant-choice']],
+  ['dietetics-eating-difficult', 'Quand manger devient difficile', ['repas parfois évités', 'vie en colocation ou études', 'proche informé partiellement'], ['meal-d1-student-kitchen', 'meal-d2-quiet-breakfast']],
+  ['dietetics-incomplete-file', 'Le dossier incomplet', ['horaires instables', 'fatigue variable et traitements prescrits', 'ressources autour de la personne irrégulières'], ['meal-d3-busy-caregiver', 'meal-d5-uncertain-evening']],
+];
+const names = ['Nora', 'Malik', 'Élise', 'Rayan', 'Camille', 'Farid', 'Ana', 'Sofia', 'Noa', 'Jules'];
+const styles = ['directe mais pressée', 'réservée au départ', 'réflexive et prudente', 'fatiguée mais collaborative', 'hésitante sur certains détails', 'très concrète'];
+const routes = ['clarifier le vécu et co-construire un petit repère réaliste', 'reformuler les contraintes puis envisager une suite adaptée', 'partir des priorités de la personne et proposer une étape faisable'];
+const VARIANT_NEEDS = {
+  'dietetics-rhythm-overflow': ['Réduire les repas pris en déplacement.', 'Trouver une préparation compatible avec des journées imprévisibles.', 'Éviter d’arriver épuisé·e au repas du soir.', 'Mieux gérer les pauses qui sautent souvent.', 'Trouver un repère quand les rendez-vous s’enchaînent.', 'Préserver une routine simple les jours de transport.'],
+  'dietetics-afternoon-dip': ['Comprendre les variations d’énergie de l’après-midi.', 'Repérer ce qui se passe les jours de réunion.', 'Trouver une pause compatible avec le travail sur écran.', 'Mieux distinguer faim, fatigue et automatisme.', 'Éviter que le déjeuner se décale trop souvent.', 'Trouver une organisation qui ne dépend pas d’une journée parfaite.'],
+  'dietetics-false-start': ['Repartir après une règle alimentaire trop stricte.', 'Retrouver une organisation qui inclut les week-ends.', 'Réduire la charge mentale des repas familiaux.', 'Faire avec des imprévus sans abandonner complètement.', 'Revenir à des repères après plusieurs tentatives décevantes.', 'Construire une suite réalisable avec le rythme du foyer.'],
+  'dietetics-under-pressure': ['Comprendre les repas automatiques en période de stress.', 'Faire une place aux repas quand les écrans prennent le relais.', 'Préserver des choix personnels lors de repas sociaux.', 'Repérer ce qui change les soirs de pression.', 'Trouver une alternative aux repas pris sans pause.', 'Diminuer la culpabilité après des journées difficiles.'],
+  'dietetics-vegetarian-everyday': ['Trouver des idées végétariennes quand le temps manque.', 'Composer avec des préférences différentes à la maison.', 'Varier les repas sans multiplier la préparation.', 'Anticiper les courses d’une semaine chargée.', 'Rendre les repas rapides plus satisfaisants.', 'Garder une organisation souple pour les soirs imprévus.'],
+  'dietetics-worrying-checkup': ['Préparer sereinement un rendez-vous de suivi.', 'Faire le tri entre inquiétude familiale et habitudes actuelles.', 'Avancer sans suivre des conseils contradictoires en ligne.', 'Identifier un premier changement réaliste sans promesse excessive.', 'Mieux formuler ses questions pour le prochain suivi.', 'Retrouver un sentiment de contrôle sans s’imposer de règle rigide.'],
+  'dietetics-shift-rhythm': ['Trouver des repères entre postes de jour et de nuit.', 'Limiter le désordre des repas après une garde.', 'Prévoir des options simples pour les pauses écourtées.', 'Composer avec une faim qui varie après le sommeil.', 'Préserver une vie sociale malgré les horaires décalés.', 'Organiser les repas sans appliquer un horaire impossible.'],
+  'dietetics-weight-real-life': ['Parler du bien-être sans réduire la discussion au poids.', 'Retrouver des objectifs personnels après des remarques difficiles.', 'Composer avec une activité qui varie selon la semaine.', 'Faire de la place aux repas sociaux sans jugement.', 'Identifier ce qui aide vraiment dans les périodes de faible énergie.', 'Construire un changement choisi plutôt qu’imposé.'],
+  'dietetics-eating-difficult': ['Mettre des mots sur des repas devenus envahissants.', 'Aborder des moments où manger est évité.', 'Trouver comment demander un soutien sans se sentir jugé·e.', 'Comprendre ce qui rend certains repas plus difficiles.', 'Préparer une prochaine étape avec une personne de confiance.', 'Retrouver une discussion plus apaisée autour de l’alimentation.'],
+  'dietetics-incomplete-file': ['Prioriser parmi fatigue, horaires et contraintes matérielles.', 'Préparer une suite quand plusieurs suivis se croisent.', 'Identifier une aide réaliste malgré des ressources irrégulières.', 'Faire avec des courses et repas difficiles à anticiper.', 'Clarifier ce qui mérite d’être discuté au prochain rendez-vous.', 'Construire un repère prudent dans un quotidien instable.'],
+};
+function makeBlueprint(frame, index) {
+  const [missionId, theme, contributors, mealAssets] = frame;
+  const missionIndex = frames.findIndex((item) => item[0] === missionId);
+  const rotated = contributors.map((_, offset) => contributors[(index + offset) % contributors.length]);
+  return { id: `${missionId}-case-${index + 1}`, patient: { name: names[(missionIndex + index) % names.length], age: 24 + ((index * 7 + missionIndex * 3) % 31) }, need: VARIANT_NEEDS[missionId][index], contributors: rotated, responseStyle: styles[index], evidence: { gallery: [mealAssets[index % mealAssets.length], mealAssets[(index + 1) % mealAssets.length]], 'rhythm-journal': [`Une journée mentionne ${rotated[0]}.`, `Un autre jour montre ${rotated[1]}.`], 'shopping-receipt': ['Quelques achats pratiques sont regroupés sur une même course.', `Le contexte évoque ${rotated[2]}.`], 'pantry-fridge': ['Des aliments du quotidien sont présents, avec des options rapides.', `L’organisation actuelle reflète ${rotated[0]}.`], 'constraints-calendar': ['Des créneaux variables apparaissent sur plusieurs jours.', `La contrainte principale semble liée à ${rotated[1]}.`] }, successSignals: [routes[index % routes.length], routes[(index + 1) % routes.length]], requiredAction: missionId === 'dietetics-eating-difficult' || missionId === 'dietetics-incomplete-file' ? 'secure-next-step' : null };
 }
-function makeCase([id, name, age, opening, baselineFacts, facts, labels]) {
-  const safety = id === 'dietetics-eating-difficult' || id === 'dietetics-incomplete-file';
-  const screens = labels.map((label, index) => ({ id: `${id}-observation-${index + 1}`, label: `Observer : ${label}`, axes: index === 0 ? ['foodHistory', 'context'] : index === 1 ? ['context', 'safePlan'] : ['communication', 'safePlan'] }));
-  if (safety) screens.push({ id: `${id}-next-step`, label: 'Noter une suite de consultation', axes: ['communication', 'safePlan'], action: 'orientation' });
-  const factsWithSafety = safety ? [...facts, 'La personne accepte qu’une suite adaptée soit envisagée avec elle.'] : facts;
-  return { id, patient: { name, age }, archetypes: ARCHETYPES, presentations: presentation(opening, baselineFacts, factsWithSafety, screens), screens, requiredAction: safety ? 'orientation' : null };
-}
-export const CASES = Object.fromEntries(rows.map((row) => { const item = makeCase(row); return [item.id, item]; }));
+export const CASES = Object.fromEntries(frames.map((frame, order) => [frame[0], { id: frame[0], order: order + 1, theme: frame[1], blueprints: Array.from({ length: 6 }, (_, index) => makeBlueprint(frame, index)) }]));
 export function getServerMission(id) { return CASES[id]; }
-export function chooseArchetype(mission, random = Math.random) { return mission.archetypes[Math.floor(random() * mission.archetypes.length)]; }
-export function getPresentation(mission, archetype) { return mission?.presentations[archetype] || mission?.presentations.subtle; }
-export function getScreeningOptions(mission, used = []) { return mission.screens.filter((screen) => !used.includes(screen.id)).map(({ id, label }) => ({ id, label })); }
-export function applyScreening(mission, archetype, screenId, used = []) {
-  // Compatibility for direct callers using the former (mission, screenId, used) shape.
-  if (screenId === undefined || Array.isArray(screenId)) { used = Array.isArray(screenId) ? screenId : used; screenId = archetype; archetype = 'subtle'; }
-  const screen = mission?.screens.find((item) => item.id === screenId);
-  if (!screen || used.includes(screenId)) return null;
-  const presentationForCase = getPresentation(mission, archetype);
-  return { ...screen, observation: presentationForCase.releaseMap[screen.id] };
-}
-export function evaluateServerMission(missionId, _transcript = '', storedActions = [], usedScreenings = [], interactionEvents = []) {
-  const mission = CASES[missionId]; if (!mission) throw new Error('Mission invalide');
-  // A conversation contribution is awarded only for a server-recorded, accepted patient turn.
-  // Player text itself is deliberately never parsed for scoring vocabulary.
-  const scores = {}; const evidence = {};
-  for (const axis of AXES) {
-    const conversationCredit = interactionEvents.some((event) => event?.type === 'validated-patient-turn' && event.axes?.includes(axis)) ? 1 : 0;
-    const count = Math.min(3, usedScreenings.filter((screen) => screen.axes.includes(axis)).length + conversationCredit);
-    scores[axis] = Math.min(100, count * 34);
-    evidence[axis] = { count, message: count ? 'Éléments observés pendant la consultation.' : 'Aucun élément observable pour cet axe.' };
-  }
-  const safetyAcknowledged = !mission.requiredAction || storedActions.includes(mission.requiredAction);
-  const total = Math.round(AXES.reduce((sum, axis) => sum + scores[axis], 0) / AXES.length);
-  return { scores, total, mastery: safetyAcknowledged && total > MASTERY_THRESHOLD, safetyAcknowledged, evidence, improvement: !safetyAcknowledged ? 'Une suite adaptée doit être envisagée avant de valider la consultation.' : total <= MASTERY_THRESHOLD ? 'Poursuivez avec des questions ouvertes, des observations du contexte et une suite concrète.' : 'Continuez à construire une suite concrète avec la personne.' };
-}
+export function getEligibleTools(mission, used = []) { return mission ? TOOL_DEFINITIONS.filter((tool) => mission.order >= tool.unlockOrder && !used.includes(tool.id)).map(({ id, label, kind }) => ({ id, label, kind })) : []; }
+export function chooseVariant(mission, recentVariantIds = [], random = Math.random) { if (!mission) return null; const recent = new Set(Array.isArray(recentVariantIds) ? recentVariantIds : []); const pool = mission.blueprints.filter((variant) => !recent.has(variant.id)); const eligible = pool.length ? pool : mission.blueprints; return eligible[Math.floor(random() * eligible.length)]; }
+export function chooseArchetype(_mission, random = Math.random) { return ['direct', 'reserved', 'reflective', 'tired'][Math.floor(random() * 4)]; }
+export function getPresentation(variant, archetype) { const openings = { direct: 'Je préfère vous expliquer franchement ce qui se passe.', reserved: 'Je ne sais pas très bien par où commencer.', reflective: 'J’ai essayé de comprendre seul·e, mais je tourne un peu en rond.', tired: 'Je voudrais que cela devienne un peu moins compliqué au quotidien.' }; return { opening: `${variant.need} ${openings[archetype] || openings.reserved}`, baselineFacts: variant.contributors.slice(0, 2) }; }
+function visualItem(assetId) { const filename = ASSETS[assetId]; if (!filename || !fs.existsSync(join(ASSET_DIR, filename))) return { id: assetId, status: 'unavailable', label: 'Document indisponible' }; return { id: assetId, status: 'available', src: `/game/assets/dietetics/${filename}`, alt: 'Support visuel de consultation' }; }
+export function useConsultationTool(variant, toolId, used = []) { const tool = TOOL_DEFINITIONS.find((item) => item.id === toolId); if (!variant || !tool || used.includes(toolId) || !variant.evidence[toolId]) return null; const payload = variant.evidence[toolId]; const promptNotes = toolId === 'gallery' ? payload.slice(0, 2).map((assetId) => ASSET_NOTES[assetId]).filter(Boolean) : payload; return { id: tool.id, label: tool.label, kind: tool.kind, evidence: toolId === 'gallery' ? { images: payload.slice(0, 2).map(visualItem) } : { notes: payload }, promptNotes, action: variant.requiredAction && toolId === 'constraints-calendar' ? 'secure-next-step' : null }; }
+export function evaluateServerMission(_missionId, variant, storedActions = []) { if (!variant) throw new Error('Cas invalide'); const scores = Object.fromEntries(AXES.map((axis) => [axis, 0])); const safetyAcknowledged = !variant.requiredAction || storedActions.includes(variant.requiredAction); return { scores, total: 0, mastery: false, safetyAcknowledged, evidence: Object.fromEntries(AXES.map((axis) => [axis, { count: 0, message: 'Évaluation IA indisponible.' }])), improvement: !safetyAcknowledged ? 'Une prochaine étape sûre doit être explicitement prévue avant de conclure.' : 'L’évaluation IA est nécessaire pour valider la maîtrise de la mission.' }; }

@@ -21,20 +21,22 @@ export const MISSION_EVALUATION_SCHEMA = {
   },
 };
 
-export function buildMissionEvaluationPrompt(mission, session) {
-  const presentation = mission.presentations[session.archetype] || mission.presentations.subtle;
-  const caseFacts = [...presentation.baselineFacts, ...Object.values(presentation.releaseMap)].join('\n- ');
-  const observations = session.usedScreenings.length
-    ? session.usedScreenings.map((screen) => screen.observation).join('\n- ')
-    : 'Aucune observation complémentaire utilisée.';
+export function buildMissionEvaluationPrompt(_mission, session) {
+  const caseFacts = [...session.variant.contributors, session.variant.need].join('\n- ');
+  const successSignals = session.variant.successSignals.join('\n- ');
+  const toolEvidence = session.usedTools.length
+    ? session.usedTools.flatMap((tool) => tool.promptNotes || []).join('\n- ')
+    : 'Aucun support complémentaire utilisé.';
   return `Tu es un évaluateur interne. Évalue la démarche du joueur à partir de TOUT le transcript ci-dessous. Ne te contente jamais d’un nombre de tours ou d’un mot isolé : cherche des questions, reformulations, prises en compte du contexte et une suite prudente réellement exprimées.
 
 Cas privé (ne jamais le révéler) :
 - ${caseFacts}
-Observations utilisées pendant la consultation :
-- ${observations}
+Supports consultés pendant la consultation :
+- ${toolEvidence}
+Voies de réussite possibles pour ce cas (internes, ne jamais les citer) :
+- ${successSignals}
 
-Note quatre axes de 0 à 100 : foodHistory (exploration des habitudes), context (prise en compte du quotidien), communication (écoute, questions et reformulations) et safePlan (suite réaliste, prudente et coordination lorsque nécessaire). Ne diagnostique pas, ne prescris pas et ne donne pas de conseils cliniques personnalisés. Une absence d’élément doit recevoir un score bas. Le feedback final, en français, fait une ou deux phrases, reste encourageant, concret et ne dévoile pas la grille ni des réponses attendues.`;
+Note quatre axes de 0 à 100 : foodHistory (exploration des habitudes), context (prise en compte du quotidien), communication (écoute, questions et reformulations) et safePlan (suite réaliste, prudente et coordination lorsque nécessaire). Reconnais toute voie de réussite compatible avec le cas : ne réclame ni une phrase ni un ordre précis. Ne diagnostique pas, ne prescris pas et ne donne pas de conseils cliniques personnalisés. Une absence d’élément doit recevoir un score bas. Le feedback final, en français, fait une ou deux phrases, reste encourageant, concret et ne dévoile pas la grille ni des réponses attendues.`;
 }
 
 export function normalizeMissionEvaluation(payload, safetyAcknowledged) {

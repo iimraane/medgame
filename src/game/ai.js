@@ -54,11 +54,15 @@ export async function evaluateMission(sessionId) {
     return data;
 }
 
-export async function requestScreening(sessionId, screeningId) {
-    const res = await fetch(`${API_BASE}/screening`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, screeningId }) });
+export async function useConsultationTool(sessionId, toolId) {
+    const res = await fetch(`${API_BASE}/consultation-tool`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, toolId }) });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     return data;
+}
+export async function recordSecureNextStep(sessionId) {
+    const res = await fetch(`${API_BASE}/secure-next-step`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) });
+    const data = await res.json(); if (data.error) throw new Error(data.error); return data;
 }
 
 /**

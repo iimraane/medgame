@@ -18,7 +18,7 @@ const { LEVELS, getLevel } = await import(pathToFileURL(join(dataDir, 'levels.js
 const { CARDS, getCardsForLevel } = await import(pathToFileURL(join(dataDir, 'cards.js')).href);
 const { MODIFIERS, pickRandomModifiers } = await import(pathToFileURL(join(dataDir, 'modifiers.js')).href);
 const { getRole } = await import(pathToFileURL(join(dataDir, 'roles.js')).href);
-const { getServerMission, evaluateServerMission, chooseArchetype, getPresentation, getScreeningOptions, applyScreening } = await import(pathToFileURL(join(__dirname, 'missions.js')).href);
+const { getServerMission, evaluateServerMission, chooseArchetype, chooseVariant, getPresentation, getEligibleTools, useConsultationTool } = await import(pathToFileURL(join(__dirname, 'missions.js')).href);
 const { getOpenAIModel, buildMissionPatientPrompt } = await import(pathToFileURL(join(__dirname, 'missionPatient.js')).href);
 const { choosePatientTraits, chooseNonVerbalCue } = await import(pathToFileURL(join(__dirname, 'patientTraits.js')).href);
 const { MISSION_EVALUATION_SCHEMA, buildMissionEvaluationPrompt, normalizeMissionEvaluation } = await import(pathToFileURL(join(__dirname, 'missionEvaluation.js')).href);
@@ -227,18 +227,19 @@ Réponds JUSTE avec les puces (ex: • Fumeur actif \n• Allergie Pénicilline 
 // ─── Start Session ───────────────────────────────────────────────
 app.post('/game/api/start', async (req, res) => {
     try {
-        const { levelId, missionId, roleId } = req.body;
+        const { levelId, missionId, roleId, recentVariantIds = [] } = req.body;
         if (missionId) {
             const mission = getServerMission(missionId);
             const role = getRole(roleId);
             if (!mission || !role?.unlocked) return res.status(400).json({ error: 'Mission ou rôle invalide' });
             const sessionId = crypto.randomUUID();
+            const variant = chooseVariant(mission, recentVariantIds);
             const archetype = chooseArchetype(mission);
             const patientTraits = choosePatientTraits();
-            const presentation = getPresentation(mission, archetype);
+            const presentation = getPresentation(variant, archetype);
             const opening = `${presentation.opening} ${chooseNonVerbalCue(patientTraits)}`;
-            sessions.set(sessionId, { createdAt: Date.now(), missionId, roleId, mission, archetype, patientTraits, disclosedFacts: [], usedScreenings: [], actions: [], interactionEvents: [], prompt: buildMissionPatientPrompt(mission, archetype, [], patientTraits), messages: [{ role: 'assistant', content: opening }] });
-            return res.json({ sessionId, patient: { name: { firstName: mission.patient.name, fullName: mission.patient.name, age: mission.patient.age, gender: 'Personne fictive' }, opening, modifiers: [], antecedentsHtml: 'Profil de consultation chargé.' }, screenings: getScreeningOptions(mission) });
+            sessions.set(sessionId, { createdAt: Date.now(), missionId, roleId, mission, variant, archetype, patientTraits, usedTools: [], actions: [], interactionEvents: [], prompt: buildMissionPatientPrompt(variant, archetype, [], patientTraits), messages: [{ role: 'assistant', content: opening }] });
+            return res.json({ sessionId, variantId: variant.id, requiresSecureNextStep: Boolean(variant.requiredAction), patient: { name: { firstName: variant.patient.name, fullName: variant.patient.name, age: variant.patient.age, gender: 'Personne fictive' }, opening, modifiers: [], antecedentsHtml: 'Profil de consultation chargé.' }, tools: getEligibleTools(mission) });
         }
         const level = getLevel(levelId);
         if (!level) return res.status(400).json({ error: 'Niveau invalide' });
@@ -297,7 +298,7 @@ app.post('/game/api/evaluate', async (req, res) => {
     const session = sessions.get(sessionId);
     if (!session?.mission) return res.status(400).json({ error: 'Session expirée ou invalide.' });
     const transcript = session.messages.filter((message) => message.role === 'user').map((message) => message.content).join('\n');
-    const fallback = evaluateServerMission(session.missionId, transcript, session.actions, session.usedScreenings, session.interactionEvents);
+    const fallback = evaluateServerMission(session.missionId, session.variant, session.actions);
     let result = fallback;
     const client = getClient();
     if (client && session.messages.some((message) => message.role === 'user')) {
@@ -321,17 +322,23 @@ app.post('/game/api/evaluate', async (req, res) => {
     res.json(result);
 });
 
-app.post('/game/api/screening', (req, res) => {
-    const { sessionId, screeningId } = req.body;
+app.post('/game/api/consultation-tool', (req, res) => {
+    const { sessionId, toolId } = req.body;
     const session = sessions.get(sessionId);
     if (!session?.mission) return res.status(400).json({ error: 'Session expirée ou invalide.' });
-    const observation = applyScreening(session.mission, session.archetype, screeningId, session.usedScreenings.map((item) => item.id));
-    if (!observation) return res.json({ observation: null, screenings: getScreeningOptions(session.mission, session.usedScreenings.map((item) => item.id)) });
-    session.usedScreenings.push(observation);
-    if (observation.action && !session.actions.includes(observation.action)) session.actions.push(observation.action);
-    session.disclosedFacts.push(observation.observation);
-    session.prompt = buildMissionPatientPrompt(session.mission, session.archetype, session.disclosedFacts, session.patientTraits);
-    return res.json({ observation: { id: observation.id, label: observation.label, text: observation.observation }, screenings: getScreeningOptions(session.mission, session.usedScreenings.map((item) => item.id)) });
+    const tool = useConsultationTool(session.variant, toolId, session.usedTools.map((item) => item.id));
+    if (!tool || !getEligibleTools(session.mission, session.usedTools.map((item) => item.id)).some((item) => item.id === toolId)) return res.json({ tool: null, tools: getEligibleTools(session.mission, session.usedTools.map((item) => item.id)) });
+    session.usedTools.push(tool);
+    const notes = session.usedTools.flatMap((usedTool) => usedTool.promptNotes || []);
+    session.prompt = buildMissionPatientPrompt(session.variant, session.archetype, notes, session.patientTraits);
+    return res.json({ tool: { id: tool.id, label: tool.label, kind: tool.kind, evidence: tool.evidence }, tools: getEligibleTools(session.mission, session.usedTools.map((item) => item.id)) });
+});
+
+app.post('/game/api/secure-next-step', (req, res) => {
+    const session = sessions.get(req.body.sessionId);
+    if (!session?.mission) return res.status(400).json({ error: 'Session expirée ou invalide.' });
+    if (session.variant.requiredAction && !session.actions.includes(session.variant.requiredAction)) session.actions.push(session.variant.requiredAction);
+    return res.json({ recorded: Boolean(session.variant.requiredAction) });
 });
 
 // ─── Chat (with built-in guardrail) ─────────────────────────────

@@ -8,7 +8,7 @@ const SETTINGS_KEY = 'medgame_settings';
 
 export const DEFAULT_SAVE = {
     currentLevel: 1, maxUnlockedLevel: 1, scores: {}, unlockedCards: [], firstTime: true,
-    selectedRole: 'dietetics', missionProgress: {}, campaignProgressVersion: 1, legacyCampaignUnlockThrough: 1,
+    selectedRole: 'dietetics', missionProgress: {}, recentVariantIds: {}, campaignProgressVersion: 1, legacyCampaignUnlockThrough: 1,
 };
 
 const DEFAULT_SETTINGS = {
@@ -42,9 +42,17 @@ export function migrateSave(raw) {
         campaignProgressVersion: 1,
         legacyCampaignUnlockThrough,
         scores: legacy.scores && typeof legacy.scores === 'object' ? legacy.scores : {},
-        unlockedCards: Array.isArray(legacy.unlockedCards) ? legacy.unlockedCards : [],
+        unlockedCards: Array.isArray(legacy.unlockedCards) ? legacy.unlockedCards : [], recentVariantIds: sanitizeRecentVariants(legacy.recentVariantIds),
     };
 }
+function sanitizeRecentVariants(value) { if (!value || typeof value !== 'object' || Array.isArray(value)) return {}; return Object.fromEntries(Object.entries(value).map(([missionId, ids]) => [missionId, Array.isArray(ids) ? [...new Set(ids.filter((id) => typeof id === 'string'))].slice(-6) : []])); }
+export function getRecentVariantIds(missionId) { return loadSave().recentVariantIds[missionId] || []; }
+export function nextRecentVariantIds(prior, variantId, cycleSize = 6) {
+    if (!variantId) return Array.isArray(prior) ? prior : [];
+    const uniquePrior = [...new Set((Array.isArray(prior) ? prior : []).filter((id) => typeof id === 'string'))].slice(-cycleSize);
+    return uniquePrior.length >= cycleSize ? [variantId] : [...new Set([...uniquePrior, variantId])].slice(-cycleSize);
+}
+export function recordVariantId(missionId, variantId) { if (!variantId) return loadSave(); const save = loadSave(); save.recentVariantIds[missionId] = nextRecentVariantIds(save.recentVariantIds[missionId], variantId); saveSave(save); return save; }
 
 function sanitizeMissionProgress(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;

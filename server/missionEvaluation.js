@@ -39,6 +39,19 @@ Voies de réussite possibles pour ce cas (internes, ne jamais les citer) :
 Note quatre axes de 0 à 100 : foodHistory (exploration des habitudes), context (prise en compte du quotidien), communication (écoute, questions et reformulations) et safePlan (suite réaliste, prudente et coordination lorsque nécessaire). Reconnais toute voie de réussite compatible avec le cas : ne réclame ni une phrase ni un ordre précis. Ne diagnostique pas, ne prescris pas et ne donne pas de conseils cliniques personnalisés. Une absence d’élément doit recevoir un score bas. Le feedback final, en français, fait une ou deux phrases, reste encourageant, concret et ne dévoile pas la grille ni des réponses attendues.`;
 }
 
+export function buildNursingEvaluationPrompt(session) {
+  const signs = session.variant.symptoms.map((symptom) => symptom.label).join('\n- ');
+  const documents = session.usedTools.length ? session.usedTools.flatMap((tool) => tool.promptNotes || []).join('\n- ') : 'Aucun document consulté.';
+  return `Tu évalues une simulation infirmière fictive à partir de TOUT le transcript. Le joueur doit recueillir des signes, demander une chronologie, communiquer avec respect et utiliser les documents s’ils sont utiles. Ne compte jamais des messages vides, répétitifs ou sans question utile. Ne donne aucun avis médical, traitement, prescription ni diagnostic au joueur.
+
+Faits privés du scénario, à ne jamais révéler :
+- ${signs}
+Documents réellement consultés :
+- ${documents}
+
+Note de 0 à 100 : foodHistory = signes effectivement explorés ; context = chronologie et utilisation raisonnée des documents ; communication = questions, écoute et reformulations ; safePlan = priorisation prudente dans le jeu. Une absence d’élément reçoit un score bas. Réponds en JSON selon le schéma fourni ; le feedback est en français, concret, court, et ne révèle ni maladie ni réponse attendue.`;
+}
+
 export function normalizeMissionEvaluation(payload, safetyAcknowledged) {
   if (!payload || typeof payload !== 'object' || !payload.scores || typeof payload.feedback !== 'string') return null;
   const scores = {};

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { NURSING_POOLS, NURSING_DISEASES } from '../src/data/nursingCampaign.js';
 
 export const MASTERY_THRESHOLD = 70;
 const AXES = ['foodHistory', 'context', 'communication', 'safePlan'];
@@ -116,7 +117,97 @@ function makeBlueprint(frame, index) {
   return { id: `${missionId}-case-${index + 1}`, patient: { name: names[(missionIndex + index) % names.length], age: 24 + ((index * 7 + missionIndex * 3) % 31) }, need: VARIANT_NEEDS[missionId][index], contributors: rotated, responseStyle: styles[index], evidence: { gallery: galleryPair, 'rhythm-journal': makeJournal(missionIndex, index), 'shopping-receipt': makeReceipt(missionIndex, index), 'pantry-fridge': makePantry(missionIndex, index), 'constraints-calendar': makeWeeklyCalendar(missionIndex, index) }, successSignals: [routes[index % routes.length], routes[(index + 1) % routes.length]] };
 }
 export const CASES = Object.fromEntries(frames.map((frame, order) => [frame[0], { id: frame[0], order: order + 1, theme: frame[1], blueprints: Array.from({ length: 6 }, (_, index) => makeBlueprint(frame, index)) }]));
-export function getServerMission(id) { return CASES[id]; }
+const NURSING_NAMES = ['Alex', 'Sam', 'Lina', 'Morgan', 'Noor', 'Camille'];
+const NURSING_VARIANT_STYLES = ['répond brièvement mais précisément', 'minimise au début', 'retrace volontiers la chronologie', 'est gêné·e par certains détails', 's’appuie sur des notes personnelles', 'est fatigué·e mais coopératif·ve'];
+const NURSING_DOCUMENTS = [
+  ['nursing-document-2', 2, 'Dossier de visite', (disease, index) => [
+    `Motif initial déclaré : « ${disease.symptoms[0]} ».`,
+    `Début rapporté : il y a ${index + 2} jours dans cette simulation.`,
+    `Allergies déclarées : ${index % 2 ? 'aucune allergie signalée' : 'information à vérifier avec la personne'}.`,
+    'Traitements déclarés : aucun nom de médicament n’est fourni dans cette simulation.',
+    'Aucune conclusion clinique ni prescription ne figure dans ce dossier fictif.',
+  ]],
+  ['nursing-document-4', 4, 'Constantes de visite', (disease, index) => [
+    `Constantes fictives horodatées : ${9 + index} h ${index % 2 ? '30' : '00'} — pouls ${72 + index * 3}/min, fréquence respiratoire ${15 + (index % 4)}/min.`,
+    `Observation recueillie : « ${disease.symptoms[1]} ».`,
+    'Un seul relevé fictif ne permet pas d’établir de diagnostic.',
+  ]],
+  ['nursing-document-6', 6, 'Compte rendu biologique', (disease) => [
+    'Bilan fictif ciblé — résultat à interpréter uniquement dans le scénario.',
+    `Élément à rapprocher de l’échange : « ${disease.symptoms[2]} ».`,
+    'Aucune valeur réelle, aucun traitement ni conduite à tenir ne sont fournis.',
+  ]],
+  ['nursing-document-8', 8, 'Compte rendu d’examen', (disease, index) => [
+    `Compte rendu fictif : le signal « ${disease.symptoms[index % disease.symptoms.length]} » est mentionné.`,
+    'La chronologie et les autres symptômes restent nécessaires pour comparer les hypothèses.',
+    'Ce document est un support de raisonnement de jeu, pas un examen médical réel.',
+  ]],
+  ['nursing-document-10', 10, 'Historique des transmissions', (disease, index) => [
+    `Visite fictive J-${index + 1} : changement fonctionnel décrit sans étiquette diagnostique.`,
+    `Appel fictif J-1 : l’entourage rapporte une évolution différente selon le moment de la journée.`,
+    'Élément contradictoire à clarifier : la personne minimise ce qui a motivé le premier appel.',
+    `Point repris aujourd’hui : « ${disease.symptoms[(index + 1) % disease.symptoms.length]} ».`,
+    'Le dossier invite à prioriser et transmettre dans la simulation ; il ne remplace pas une prise en charge réelle.',
+  ]],
+];
+function nursingDocuments(order, disease, index) {
+  return Object.fromEntries(NURSING_DOCUMENTS
+    .filter(([, unlock]) => order >= unlock)
+    .map(([id, , title, facts]) => [id, { title, facts: facts(disease, index) }]));
+}
+function makeNursingMission(pool) {
+  const diseases = pool.diseaseIds.map((id) => NURSING_DISEASES[id]);
+  return { id: `nursing-${pool.order}`, roleId: 'nursing', order: pool.order, theme: pool.theme, diseases, blueprints: diseases.flatMap((disease) => Array.from({ length: 6 }, (_, index) => ({
+    id: `${pool.order}-${disease.id}-case-${index + 1}`, diseaseId: disease.id, patient: { name: NURSING_NAMES[index], age: 27 + ((index * 6 + pool.order) % 38) }, responseStyle: NURSING_VARIANT_STYLES[index],
+    opening: ['Je ne me sens pas comme d’habitude depuis quelques jours.', 'Je voulais en parler parce que ça change dans mon quotidien.', 'J’ai noté des choses, mais je ne sais pas ce qui est utile.'][index % 3],
+    symptoms: disease.symptoms.map((label, symptomIndex) => ({ id: `${disease.id}-symptom-${symptomIndex + 1}`, label })),
+    evidence: nursingDocuments(pool.order, disease, index),
+  }))) };
+}
+export const NURSING_CASES = Object.freeze(Object.fromEntries(NURSING_POOLS.map((pool) => [`nursing-${pool.order}`, makeNursingMission(pool)])));
+export function getServerMission(id) { return CASES[id] || NURSING_CASES[id]; }
+export function isNursingMission(mission) { return mission?.roleId === 'nursing'; }
+export function chooseNursingCase(mission, recentVariantIds = [], random = Math.random) { return chooseVariant(mission, recentVariantIds, random); }
+export function getNursingTools(mission) { return NURSING_DOCUMENTS.filter(([, order]) => mission.order >= order).map(([id, , label]) => ({ id, label, kind: 'nursing-document' })); }
+export function useNursingTool(variant, toolId, used = []) { const evidence = variant?.evidence?.[toolId]; if (!evidence) return null; return { id: toolId, label: evidence.title, kind: 'nursing-document', alreadyConsulted: used.includes(toolId), evidence, promptNotes: evidence.facts }; }
+export function transcriptConfirmedSymptoms(session) { const transcript = session.messages.filter((message) => message.role === 'assistant').map((message) => message.content.toLowerCase()).join('\n'); return session.variant.symptoms.filter((symptom) => transcript.includes(symptom.label.toLowerCase())); }
+export function sanitizeNursingPins(session, requestedPins = []) {
+  const confirmedIds = new Set(transcriptConfirmedSymptoms(session).map((symptom) => symptom.id));
+  const allowedStates = new Set(['confirmed', 'to-verify', 'dismissed']);
+  return requestedPins
+    .filter((pin) => pin && typeof pin === 'object' && confirmedIds.has(pin.id) && allowedStates.has(pin.state))
+    .map((pin) => ({ id: pin.id, state: pin.state }));
+}
+export function evaluateNursingHypothesis(session, diseaseId) {
+  const disease = NURSING_DISEASES[diseaseId];
+  if (!disease || !session.mission.diseases.some((item) => item.id === diseaseId)) return { error: 'Hypothèse inconnue pour cette mission.' };
+  const confirmed = transcriptConfirmedSymptoms(session);
+  const creditedPins = (session.symptomPins || []).filter((pin) => pin.state !== 'dismissed');
+  const exploredSymptoms = creditedPins.length ? confirmed.filter((symptom) => creditedPins.some((pin) => pin.id === symptom.id)) : confirmed;
+  const userMessages = session.messages.filter((message) => message.role === 'user').length;
+  const correct = diseaseId === session.variant.diseaseId;
+  const escalationRequired = new Set(['pulmonary-embolism-pattern', 'meningitis-pattern', 'sepsis-alert-pattern']).has(session.variant.diseaseId);
+  const escalationMentioned = session.messages.some((message) => message.role === 'user' && /(?:appeler|urgence|samu|transmettre|orienter|évaluer rapidement)/i.test(message.content));
+  const scores = {
+    foodHistory: Math.min(100, exploredSymptoms.length * 34),
+    context: Math.min(100, session.usedTools.length * 25 + (userMessages >= 3 ? 25 : 0)),
+    communication: Math.min(100, userMessages * 20 + (exploredSymptoms.length >= 2 ? 20 : 0)),
+    safePlan: Math.min(100, correct ? 55 + exploredSymptoms.length * 15 : 20 + exploredSymptoms.length * 10),
+  };
+  const total = correct ? Math.round(Object.values(scores).reduce((sum, score) => sum + score, 0) / 4) : Math.min(55, Math.round(Object.values(scores).reduce((sum, score) => sum + score, 0) / 4));
+  return {
+    correct, selectedDiseaseId: diseaseId, total, mastery: correct && total >= MASTERY_THRESHOLD && (!escalationRequired || escalationMentioned),
+    scores, safetyAcknowledged: true, confirmedSymptoms: confirmed.map((symptom) => symptom.id),
+    evidence: {
+      foodHistory: { count: exploredSymptoms.length, message: `${exploredSymptoms.length} signe(s) explicitement recueilli(s).` },
+      context: { count: session.usedTools.length, message: `${session.usedTools.length} document(s) consulté(s), plus la chronologie dans l’échange.` },
+      communication: { count: userMessages, message: `${userMessages} question(s) ou reformulation(s) du joueur.` },
+      safePlan: { count: correct && (!escalationRequired || escalationMentioned) ? 1 : 0, message: escalationRequired && !escalationMentioned ? 'Ce scénario fictif attend une priorisation explicite avant toute maîtrise.' : correct ? 'Hypothèse cohérente pour ce cas fictif.' : 'Hypothèse à reconsidérer à partir des faits confirmés.' },
+    },
+    improvement: escalationRequired && !escalationMentioned ? 'Dans ce scénario fictif, explicitez une transmission ou une orientation prioritaire avant de conclure.' : correct ? 'La suite consiste à expliquer les indices retenus et à vérifier ceux qui restent incertains.' : 'Reprenez la chronologie, les signes explicitement dits par le patient et les documents déjà ouverts.',
+    feedback: correct ? 'Hypothèse cohérente dans cette simulation fictive. La qualité de l’exploration compte autant que le choix final.' : 'Cette hypothèse ne correspond pas au cas fictif. Reprenez la chronologie et les faits confirmés.',
+  };
+}
 export function getEligibleTools(mission) { return mission ? TOOL_DEFINITIONS.filter((tool) => mission.order >= tool.unlockOrder).map(({ id, label, kind }) => ({ id, label, kind })) : []; }
 export function chooseVariant(mission, recentVariantIds = [], random = Math.random) { if (!mission) return null; const recent = new Set(Array.isArray(recentVariantIds) ? recentVariantIds : []); const pool = mission.blueprints.filter((variant) => !recent.has(variant.id)); const eligible = pool.length ? pool : mission.blueprints; return eligible[Math.floor(random() * eligible.length)]; }
 export function chooseArchetype(_mission, random = Math.random) { return ['direct', 'reserved', 'reflective', 'tired'][Math.floor(random() * 4)]; }

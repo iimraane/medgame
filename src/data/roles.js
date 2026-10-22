@@ -40,8 +40,7 @@ export const ROLES = {
     description: 'Accompagner, surveiller et soutenir au plus près du quotidien.',
     theme: 'nursing',
     panelAsset: 'campus-panel-nursing.png',
-    unlocked: false,
-    unlockRequirement: 'Bientôt disponible',
+    unlocked: true,
     hotspot: { left: 42.8, top: 34.7, width: 10.8, height: 25.5 },
     manual: {
       purpose: 'Accompagner, surveiller et soutenir les personnes dans leur quotidien de soin.',

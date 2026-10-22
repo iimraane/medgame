@@ -12,5 +12,7 @@ export const MISSIONS = [
   ['dietetics-eating-difficult', 'Quand manger devient difficile', '🧭', 'Une consultation délicate qui appelle une attention respectueuse.'],
   ['dietetics-incomplete-file', 'Le dossier incomplet', '🧩', 'Avancer prudemment parmi plusieurs contextes qui se croisent.'],
 ].map(([id, title, icon, summary], index) => ({ id, roleId: 'dietetics', order: index + 1, title, icon, summary }));
+import { NURSING_POOLS } from './nursingCampaign.js';
+MISSIONS.push(...NURSING_POOLS.map((pool) => ({ id: `nursing-${pool.order}`, roleId: 'nursing', order: pool.order, title: pool.theme, icon: '🩹', summary: 'Simulation éducative fictive : explorer, vérifier et formuler une hypothèse.' })));
 export function getMission(id) { return MISSIONS.find((mission) => mission.id === id); }
 export function getMissionsForRole(roleId) { return MISSIONS.filter((mission) => mission.roleId === roleId); }

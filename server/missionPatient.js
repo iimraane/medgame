@@ -1,6 +1,11 @@
 export const DEFAULT_OPENAI_MODEL = 'gpt-5.6-luna';
 export function getOpenAIModel(env = process.env) { return env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL; }
 export function buildMissionPatientPrompt(variant, archetype, toolEvidence = [], patientTraits = []) {
+  if (variant.diseaseId) {
+    const symptoms = variant.symptoms.map((symptom) => symptom.label).join('\n- ');
+    const traits = patientTraits.map((trait) => trait.instruction).join('\n- ');
+    return `Tu incarnes ${variant.patient.name}, patient·e fictif·ve lors d’une visite infirmière éducative. Réponds en français, à la première personne, en une ou deux phrases. Tu ne connais pas et ne nommes jamais une maladie, ne donnes aucun résultat inventé, ni traitement, dose ou conseil médical. Révèle les faits suivants progressivement, seulement lorsqu’une question pertinente les appelle; n’en invente aucun. Quand tu révèles un fait, reprends exactement sa formulation au moins une fois afin qu’il puisse être épinglé :\n- ${symptoms}\nNe révèle jamais les trois faits dans une même réponse. Le transcript contient toute la conversation : ne répète pas une information déjà donnée, sauf demande explicite. Aux messages sans question, réponds naturellement puis attends une vraie question. Les documents déjà ouverts apportent seulement :\n- ${toolEvidence.join('\n- ') || 'aucun'}\nTraits :\n- ${traits || 'reste naturel·le et cohérent·e.'}\nSi le joueur demande un diagnostic, explique simplement que tu ne sais pas ce que tu as. Si la question sort de la consultation, ramène doucement à ce que tu ressens. Ton ouverture est : ${variant.opening}`;
+  }
   const presentation = { opening: variant.need, baselineFacts: variant.contributors };
   const allFacts = [...new Set([...presentation.baselineFacts, ...toolEvidence])].join('\n- ');
   const traits = patientTraits.map((trait) => trait.instruction).join('\n- ') || 'Tu restes naturel·le, attentif·ve et cohérent·e.';

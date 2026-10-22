@@ -74,9 +74,9 @@ test('campus artwork and its interactive controls share one centered source-rati
   assert.match(css, /\.campus-art-plane \{[^}]*top: 50%;[^}]*left: 50%;[^}]*width: max\(100%, calc\(100vh \* 1\.776833\)\);[^}]*height: max\(100%, calc\(100vw \* \.562799\)\);[^}]*transform: translate\(-50%, -50%\)/);
 });
 
-test('dietetics is the sole open role', () => {
+test('dietetics and Nursing are the only open roles', () => {
   assert.equal(getRole('dietetics').unlocked, true);
-  assert.deepEqual(Object.values(ROLES).filter((role) => role.unlocked).map((role) => role.id), ['dietetics']);
+  assert.deepEqual(Object.values(ROLES).filter((role) => role.unlocked).map((role) => role.id), ['dietetics', 'nursing']);
 });
 
 test('every profession maps to a stable baked campus panel image', () => {
@@ -108,8 +108,9 @@ test('locked roles retain a visible coming-soon requirement', () => {
   }
 });
 
-test('only the dietetics door produces a mission-map action', () => {
+test('only Dietetics and Nursing doors produce mission-map actions', () => {
   assert.deepEqual(getDoorAction('dietetics'), { roleId: 'dietetics' });
+  assert.deepEqual(getDoorAction('nursing'), { roleId: 'nursing' });
   for (const role of Object.values(ROLES).filter((candidate) => !candidate.unlocked)) {
     const action = getDoorAction(role.id);
     assert.equal(action.roleId, undefined);

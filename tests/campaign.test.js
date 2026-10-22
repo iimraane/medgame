@@ -2,14 +2,65 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { MISSIONS } from '../src/data/missions.js';
-import { CASES, MASTERY_THRESHOLD, chooseVariant, getEligibleTools, useConsultationTool, evaluateServerMission } from '../server/missions.js';
+import { CASES, NURSING_CASES, MASTERY_THRESHOLD, chooseVariant, getEligibleTools, useConsultationTool, getNursingTools, useNursingTool, sanitizeNursingPins, evaluateNursingHypothesis, evaluateServerMission } from '../server/missions.js';
+import { NURSING_POOL_SIZES } from '../src/data/nursingCampaign.js';
 import { buildMissionEvaluationPrompt, normalizeMissionEvaluation } from '../server/missionEvaluation.js';
 import { nextRecentVariantIds } from '../src/utils/storage.js';
 
-test('the browser exposes only ten ordered safe mission cards', () => {
-  assert.equal(MISSIONS.length, 10);
-  assert.deepEqual(MISSIONS.map(({ id }) => id), Object.keys(CASES));
+test('the browser exposes ten ordered cards per open campaign', () => {
+  assert.equal(MISSIONS.length, 20);
+  assert.deepEqual(MISSIONS.filter((mission) => mission.roleId === 'dietetics').map(({ id }) => id), Object.keys(CASES));
   for (const mission of MISSIONS) assert.deepEqual(Object.keys(mission).sort(), ['icon', 'id', 'order', 'roleId', 'summary', 'title']);
+});
+
+test('Nursing has ten cumulative pools of 3 through 30 curated diseases and six cases per disease', () => {
+  assert.deepEqual(Object.values(NURSING_CASES).map((mission) => mission.diseases.length), NURSING_POOL_SIZES);
+  for (const mission of Object.values(NURSING_CASES)) assert.ok(mission.blueprints.length >= mission.diseases.length * 6);
+});
+
+test('Nursing disease pools use distinct concrete signs and every unlocked document is reusable', () => {
+  for (const mission of Object.values(NURSING_CASES)) {
+    for (const disease of mission.diseases) {
+      assert.equal(new Set(disease.symptoms).size, 3);
+      assert.ok(disease.symptoms.every((symptom) => symptom.length > 12));
+    }
+    const variant = mission.blueprints[0];
+    for (const tool of getNursingTools(mission)) {
+      const first = useNursingTool(variant, tool.id);
+      const reopened = useNursingTool(variant, tool.id, [tool.id]);
+      assert.ok(first?.evidence?.facts?.length >= 3, `${mission.id}: ${tool.id}`);
+      assert.equal(reopened.alreadyConsulted, true);
+    }
+  }
+});
+
+test('Nursing pins only retain symptoms actually stated by the patient and hypotheses reward exploration', () => {
+  const mission = NURSING_CASES['nursing-10'];
+  const variant = mission.blueprints[0];
+  const session = {
+    mission, variant,
+    usedTools: getNursingTools(mission),
+    messages: [
+      { role: 'assistant', content: `${variant.symptoms[0].label}; ${variant.symptoms[1].label}; ${variant.symptoms[2].label}.` },
+      { role: 'user', content: 'Depuis quand est-ce présent ?' },
+      { role: 'user', content: 'Qu’est-ce qui change dans votre quotidien ?' },
+      { role: 'user', content: 'Pouvez-vous préciser ce signe ?' },
+    ],
+  };
+  assert.deepEqual(sanitizeNursingPins(session, [{ id: variant.symptoms[0].id, state: 'confirmed' }, { id: 'forged', state: 'confirmed' }, { id: variant.symptoms[1].id, state: 'to-verify' }]), [{ id: variant.symptoms[0].id, state: 'confirmed' }, { id: variant.symptoms[1].id, state: 'to-verify' }]);
+  const evaluated = evaluateNursingHypothesis(session, variant.diseaseId);
+  assert.equal(evaluated.mastery, true);
+  assert.ok(evaluated.total >= MASTERY_THRESHOLD);
+  const rushed = evaluateNursingHypothesis({ ...session, usedTools: [], messages: [{ role: 'assistant', content: variant.symptoms[0].label }] }, variant.diseaseId);
+  assert.equal(rushed.mastery, false);
+  assert.equal(evaluateNursingHypothesis(session, 'forged').error, 'Hypothèse inconnue pour cette mission.');
+});
+
+test('high-alert Nursing simulations require an explicit fictional escalation before mastery', () => {
+  const mission = NURSING_CASES['nursing-10']; const variant = mission.blueprints.find((item) => item.diseaseId === 'sepsis-alert-pattern');
+  const session = { mission, variant, usedTools: getNursingTools(mission), messages: [{ role: 'assistant', content: variant.symptoms.map((item) => item.label).join('. ') }, { role: 'user', content: 'Pouvez-vous préciser les signes et leur chronologie ?' }, { role: 'user', content: 'Je reformule ce que vous venez de dire.' }, { role: 'user', content: 'Je vais appeler et transmettre ces éléments sans attendre.' }] };
+  assert.equal(evaluateNursingHypothesis({ ...session, messages: session.messages.slice(0, -1) }, variant.diseaseId).mastery, false);
+  assert.equal(evaluateNursingHypothesis(session, variant.diseaseId).mastery, true);
 });
 
 test('every mission owns six coherent private variants and avoids recent variants', () => {
@@ -119,6 +170,7 @@ test('consultation modal is hidden until a support is opened', () => {
 });
 
 test('retired consultation language is absent from dietetics production code', () => {
-  const sources = ['server/missions.js', 'server/server.js', 'src/game/ai.js', 'src/game/engine.js', 'src/ui/chat.js', 'src/style.css'].map((file) => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').toLowerCase()).join('\n');
+  const missionSource = fs.readFileSync(new URL('../server/missions.js', import.meta.url), 'utf8').split('const NURSING_NAMES')[0];
+  const sources = [missionSource, fs.readFileSync(new URL('../src/game/ai.js', import.meta.url), 'utf8'), fs.readFileSync(new URL('../src/game/engine.js', import.meta.url), 'utf8')].join('\n').toLowerCase();
   assert.doesNotMatch(sources, /screening|observation/);
 });

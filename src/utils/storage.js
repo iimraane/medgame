@@ -90,7 +90,7 @@ export function recordMissionResult(missionId, result) {
 
 export function isMissionUnlocked(mission, missions, save = loadSave()) {
     if (mission.order === 1) return true;
-    if (mission.order <= (save.legacyCampaignUnlockThrough || 1)) return true;
+    if (mission.roleId === 'dietetics' && mission.order <= (save.legacyCampaignUnlockThrough || 1)) return true;
     const previous = missions.find((item) => item.roleId === mission.roleId && item.order === mission.order - 1);
     return Boolean(previous && save.missionProgress[previous.id]?.mastered);
 }

@@ -64,6 +64,14 @@ export async function recordSecureNextStep(sessionId) {
     const res = await fetch(`${API_BASE}/secure-next-step`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) });
     const data = await res.json(); if (data.error) throw new Error(data.error); return data;
 }
+export async function syncNursingSymptoms(sessionId, pins = []) {
+    const res = await fetch(`${API_BASE}/nursing-symptoms`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, pins }) });
+    const data = await res.json(); if (data.error) throw new Error(data.error); return data;
+}
+export async function submitNursingHypothesis(sessionId, diseaseId) {
+    const res = await fetch(`${API_BASE}/nursing-hypothesis`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, diseaseId }) });
+    const data = await res.json(); if (data.error) throw new Error(data.error); return data;
+}
 
 /**
  * Request exams from the AI (lab or radio)

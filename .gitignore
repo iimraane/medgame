@@ -3,3 +3,4 @@ node_modules/
 dist/
 .agents/
 _bmad/.env
+_bmad/

@@ -2,6 +2,7 @@ import fs from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { NURSING_POOLS, NURSING_DISEASES } from '../src/data/nursingCampaign.js';
+import { NURSING_DOCUMENT_DEFINITIONS, getNursingDossier } from './nursingDossiers.js';
 
 export const MASTERY_THRESHOLD = 70;
 const AXES = ['foodHistory', 'context', 'communication', 'safePlan'];
@@ -119,41 +120,12 @@ function makeBlueprint(frame, index) {
 export const CASES = Object.fromEntries(frames.map((frame, order) => [frame[0], { id: frame[0], order: order + 1, theme: frame[1], blueprints: Array.from({ length: 6 }, (_, index) => makeBlueprint(frame, index)) }]));
 const NURSING_NAMES = ['Alex', 'Sam', 'Lina', 'Morgan', 'Noor', 'Camille'];
 const NURSING_VARIANT_STYLES = ['répond brièvement mais précisément', 'minimise au début', 'retrace volontiers la chronologie', 'est gêné·e par certains détails', 's’appuie sur des notes personnelles', 'est fatigué·e mais coopératif·ve'];
-const NURSING_DOCUMENTS = [
-  ['nursing-document-2', 2, 'Dossier de visite', (disease, index) => [
-    `Motif initial déclaré : « ${disease.symptoms[0]} ».`,
-    `Début rapporté : il y a ${index + 2} jours dans cette simulation.`,
-    `Allergies déclarées : ${index % 2 ? 'aucune allergie signalée' : 'information à vérifier avec la personne'}.`,
-    'Traitements déclarés : aucun nom de médicament n’est fourni dans cette simulation.',
-    'Aucune conclusion clinique ni prescription ne figure dans ce dossier fictif.',
-  ]],
-  ['nursing-document-4', 4, 'Constantes de visite', (disease, index) => [
-    `Constantes fictives horodatées : ${9 + index} h ${index % 2 ? '30' : '00'} — pouls ${72 + index * 3}/min, fréquence respiratoire ${15 + (index % 4)}/min.`,
-    `Observation recueillie : « ${disease.symptoms[1]} ».`,
-    'Un seul relevé fictif ne permet pas d’établir de diagnostic.',
-  ]],
-  ['nursing-document-6', 6, 'Compte rendu biologique', (disease) => [
-    'Bilan fictif ciblé — résultat à interpréter uniquement dans le scénario.',
-    `Élément à rapprocher de l’échange : « ${disease.symptoms[2]} ».`,
-    'Aucune valeur réelle, aucun traitement ni conduite à tenir ne sont fournis.',
-  ]],
-  ['nursing-document-8', 8, 'Compte rendu d’examen', (disease, index) => [
-    `Compte rendu fictif : le signal « ${disease.symptoms[index % disease.symptoms.length]} » est mentionné.`,
-    'La chronologie et les autres symptômes restent nécessaires pour comparer les hypothèses.',
-    'Ce document est un support de raisonnement de jeu, pas un examen médical réel.',
-  ]],
-  ['nursing-document-10', 10, 'Historique des transmissions', (disease, index) => [
-    `Visite fictive J-${index + 1} : changement fonctionnel décrit sans étiquette diagnostique.`,
-    `Appel fictif J-1 : l’entourage rapporte une évolution différente selon le moment de la journée.`,
-    'Élément contradictoire à clarifier : la personne minimise ce qui a motivé le premier appel.',
-    `Point repris aujourd’hui : « ${disease.symptoms[(index + 1) % disease.symptoms.length]} ».`,
-    'Le dossier invite à prioriser et transmettre dans la simulation ; il ne remplace pas une prise en charge réelle.',
-  ]],
-];
-function nursingDocuments(order, disease, index) {
-  return Object.fromEntries(NURSING_DOCUMENTS
+function nursingDocuments(order, diseaseId) {
+  const dossier = getNursingDossier(diseaseId);
+  if (!dossier) return {};
+  return Object.fromEntries(NURSING_DOCUMENT_DEFINITIONS
     .filter(([, unlock]) => order >= unlock)
-    .map(([id, , title, facts]) => [id, { title, facts: facts(disease, index) }]));
+    .flatMap(([id]) => dossier[id] ? [[id, dossier[id]]] : []));
 }
 function makeNursingMission(pool) {
   const diseases = pool.diseaseIds.map((id) => NURSING_DISEASES[id]);
@@ -161,14 +133,14 @@ function makeNursingMission(pool) {
     id: `${pool.order}-${disease.id}-case-${index + 1}`, diseaseId: disease.id, patient: { name: NURSING_NAMES[index], age: 27 + ((index * 6 + pool.order) % 38) }, responseStyle: NURSING_VARIANT_STYLES[index],
     opening: ['Je ne me sens pas comme d’habitude depuis quelques jours.', 'Je voulais en parler parce que ça change dans mon quotidien.', 'J’ai noté des choses, mais je ne sais pas ce qui est utile.'][index % 3],
     symptoms: disease.symptoms.map((label, symptomIndex) => ({ id: `${disease.id}-symptom-${symptomIndex + 1}`, label })),
-    evidence: nursingDocuments(pool.order, disease, index),
+    evidence: nursingDocuments(pool.order, disease.id),
   }))) };
 }
 export const NURSING_CASES = Object.freeze(Object.fromEntries(NURSING_POOLS.map((pool) => [`nursing-${pool.order}`, makeNursingMission(pool)])));
 export function getServerMission(id) { return CASES[id] || NURSING_CASES[id]; }
 export function isNursingMission(mission) { return mission?.roleId === 'nursing'; }
 export function chooseNursingCase(mission, recentVariantIds = [], random = Math.random) { return chooseVariant(mission, recentVariantIds, random); }
-export function getNursingTools(mission) { return NURSING_DOCUMENTS.filter(([, order]) => mission.order >= order).map(([id, , label]) => ({ id, label, kind: 'nursing-document' })); }
+export function getNursingTools(mission) { return NURSING_DOCUMENT_DEFINITIONS.filter(([, order]) => mission.order >= order).map(([id, , label]) => ({ id, label, kind: 'nursing-document' })); }
 export function useNursingTool(variant, toolId, used = []) { const evidence = variant?.evidence?.[toolId]; if (!evidence) return null; return { id: toolId, label: evidence.title, kind: 'nursing-document', alreadyConsulted: used.includes(toolId), evidence, promptNotes: evidence.facts }; }
 export function transcriptConfirmedSymptoms(session) { const transcript = session.messages.filter((message) => message.role === 'assistant').map((message) => message.content.toLowerCase()).join('\n'); return session.variant.symptoms.filter((symptom) => transcript.includes(symptom.label.toLowerCase())); }
 export function sanitizeNursingPins(session, requestedPins = []) {

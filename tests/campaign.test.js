@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import { MISSIONS } from '../src/data/missions.js';
 import { CASES, NURSING_CASES, MASTERY_THRESHOLD, chooseVariant, getEligibleTools, useConsultationTool, getNursingTools, useNursingTool, sanitizeNursingPins, evaluateNursingHypothesis, evaluateServerMission } from '../server/missions.js';
 import { NURSING_POOL_SIZES } from '../src/data/nursingCampaign.js';
+import { NURSING_DISEASES } from '../src/data/nursingCampaign.js';
+import { NURSING_DOSSIERS, NURSING_DOCUMENT_DEFINITIONS } from '../server/nursingDossiers.js';
 import { buildMissionEvaluationPrompt, normalizeMissionEvaluation } from '../server/missionEvaluation.js';
 import { nextRecentVariantIds } from '../src/utils/storage.js';
 
@@ -18,7 +20,29 @@ test('Nursing has ten cumulative pools of 3 through 30 curated diseases and six 
   for (const mission of Object.values(NURSING_CASES)) assert.ok(mission.blueprints.length >= mission.diseases.length * 6);
 });
 
-test('Nursing disease pools use distinct concrete signs and every unlocked document is reusable', () => {
+test('Nursing has an authored, complete server-only dossier for every condition', () => {
+  assert.deepEqual(Object.keys(NURSING_DOSSIERS).sort(), Object.keys(NURSING_DISEASES).sort());
+  for (const [diseaseId, dossier] of Object.entries(NURSING_DOSSIERS)) {
+    assert.deepEqual(Object.keys(dossier).sort(), NURSING_DOCUMENT_DEFINITIONS.map(([id]) => id).sort());
+    const allFacts = Object.values(dossier).flatMap((document) => document.facts);
+    assert.equal(new Set(allFacts).size, allFacts.length, diseaseId);
+    for (const [documentId, _unlock, label] of NURSING_DOCUMENT_DEFINITIONS) {
+      const document = dossier[documentId];
+      assert.equal(document.title, label, `${diseaseId}/${documentId}`);
+      assert.ok(document.facts.length >= 3 && document.facts.length <= 6, diseaseId);
+      assert.ok(document.facts.every((fact) => fact.length > 18), diseaseId);
+      assert.equal(document.facts.join(' ').includes(NURSING_DISEASES[diseaseId].name), false, diseaseId);
+    }
+  }
+  for (const [documentId] of NURSING_DOCUMENT_DEFINITIONS) {
+    const factStructures = Object.values(NURSING_DOSSIERS).map((dossier) => JSON.stringify(dossier[documentId].facts));
+    assert.equal(new Set(factStructures).size, factStructures.length, `${documentId} must vary for all diseases`);
+  }
+  const fullDossiers = Object.values(NURSING_DOSSIERS).map((dossier) => JSON.stringify(dossier));
+  assert.equal(new Set(fullDossiers).size, fullDossiers.length, 'distinct conditions must not share an entire dossier');
+});
+
+test('Nursing disease pools use distinct concrete signs and only expose the authored unlocked dossier', () => {
   for (const mission of Object.values(NURSING_CASES)) {
     for (const disease of mission.diseases) {
       assert.equal(new Set(disease.symptoms).size, 3);
@@ -29,8 +53,12 @@ test('Nursing disease pools use distinct concrete signs and every unlocked docum
       const first = useNursingTool(variant, tool.id);
       const reopened = useNursingTool(variant, tool.id, [tool.id]);
       assert.ok(first?.evidence?.facts?.length >= 3, `${mission.id}: ${tool.id}`);
+      assert.deepEqual(first.evidence, NURSING_DOSSIERS[variant.diseaseId][tool.id]);
       assert.equal(reopened.alreadyConsulted, true);
     }
+    const expectedCount = NURSING_DOCUMENT_DEFINITIONS.filter(([, unlock]) => mission.order >= unlock).length;
+    assert.equal(getNursingTools(mission).length, expectedCount);
+    assert.deepEqual(getNursingTools(mission).map(({ id, label }) => [id, label]), NURSING_DOCUMENT_DEFINITIONS.filter(([, unlock]) => mission.order >= unlock).map(([id, _unlock, label]) => [id, label]));
   }
 });
 

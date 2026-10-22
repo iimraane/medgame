@@ -239,7 +239,7 @@ app.post('/game/api/start', async (req, res) => {
             const presentation = getPresentation(variant, archetype);
             const opening = `${presentation.opening} ${chooseNonVerbalCue(patientTraits)}`;
             sessions.set(sessionId, { createdAt: Date.now(), missionId, roleId, mission, variant, archetype, patientTraits, usedTools: [], actions: [], interactionEvents: [], prompt: buildMissionPatientPrompt(variant, archetype, [], patientTraits), messages: [{ role: 'assistant', content: opening }] });
-            return res.json({ sessionId, variantId: variant.id, requiresSecureNextStep: Boolean(variant.requiredAction), patient: { name: { firstName: variant.patient.name, fullName: variant.patient.name, age: variant.patient.age, gender: 'Personne fictive' }, opening, modifiers: [], antecedentsHtml: 'Profil de consultation chargé.' }, tools: getEligibleTools(mission) });
+            return res.json({ sessionId, variantId: variant.id, patient: { name: { firstName: variant.patient.name, fullName: variant.patient.name, age: variant.patient.age, gender: 'Personne fictive' }, opening, modifiers: [], antecedentsHtml: 'Profil de consultation chargé.' }, tools: getEligibleTools(mission) });
         }
         const level = getLevel(levelId);
         if (!level) return res.status(400).json({ error: 'Niveau invalide' });
@@ -326,12 +326,15 @@ app.post('/game/api/consultation-tool', (req, res) => {
     const { sessionId, toolId } = req.body;
     const session = sessions.get(sessionId);
     if (!session?.mission) return res.status(400).json({ error: 'Session expirée ou invalide.' });
-    const tool = useConsultationTool(session.variant, toolId, session.usedTools.map((item) => item.id));
-    if (!tool || !getEligibleTools(session.mission, session.usedTools.map((item) => item.id)).some((item) => item.id === toolId)) return res.json({ tool: null, tools: getEligibleTools(session.mission, session.usedTools.map((item) => item.id)) });
-    session.usedTools.push(tool);
-    const notes = session.usedTools.flatMap((usedTool) => usedTool.promptNotes || []);
-    session.prompt = buildMissionPatientPrompt(session.variant, session.archetype, notes, session.patientTraits);
-    return res.json({ tool: { id: tool.id, label: tool.label, kind: tool.kind, evidence: tool.evidence }, tools: getEligibleTools(session.mission, session.usedTools.map((item) => item.id)) });
+    const usedToolIds = session.usedTools.map((item) => item.id);
+    const tool = useConsultationTool(session.variant, toolId, usedToolIds);
+    if (!tool || !getEligibleTools(session.mission).some((item) => item.id === toolId)) return res.json({ tool: null, tools: getEligibleTools(session.mission) });
+    if (!tool.alreadyConsulted) {
+        session.usedTools.push(tool);
+        const notes = session.usedTools.flatMap((usedTool) => usedTool.promptNotes || []);
+        session.prompt = buildMissionPatientPrompt(session.variant, session.archetype, notes, session.patientTraits);
+    }
+    return res.json({ tool: { id: tool.id, label: tool.label, kind: tool.kind, evidence: tool.evidence }, tools: getEligibleTools(session.mission) });
 });
 
 app.post('/game/api/secure-next-step', (req, res) => {

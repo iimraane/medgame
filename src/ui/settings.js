@@ -63,19 +63,24 @@ export function renderSettings(container) {
           </button>
         </div>
 
-        <div class="settings__section" style="margin-top:32px">
-          <div class="settings__section-title">À propos</div>
-          <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6">
-            <strong>MedGame</strong> v2.0 — Jeu de simulation de consultations médicales.<br>
-            Les patients sont générés par IA (GPT-4o-mini) avec des personnalités et pathologies aléatoires.<br>
-            MedGame ne remplace en aucun cas un avis médical.
-          </p>
-        </div>
-
         <div style="margin-top:20px">
           <button class="btn btn--primary" id="btn-save" style="width:100%">
             💾 Sauvegarder les paramètres
           </button>
+        </div>
+      </div>
+      <div class="settings-admin-dialog" id="admin-dialog" hidden>
+        <div class="settings-admin-dialog__card" role="dialog" aria-modal="true" aria-labelledby="admin-dialog-title" aria-describedby="admin-dialog-description">
+          <button class="settings-admin-dialog__close" id="admin-cancel" type="button" aria-label="Fermer">×</button>
+          <p class="settings-admin-dialog__eyebrow">ACCÈS ADMINISTRATEUR</p>
+          <h2 id="admin-dialog-title">Débloquer le parcours</h2>
+          <p id="admin-dialog-description">Le mode administrateur ouvre les dix missions de diététique sur cet appareil.</p>
+          <form id="admin-form">
+            <label for="admin-password">Mot de passe</label>
+            <input id="admin-password" type="password" autocomplete="off" placeholder="Mot de passe administrateur" required>
+            <p class="settings-admin-dialog__feedback" id="admin-feedback" role="alert"></p>
+            <button class="btn btn--primary" id="admin-confirm" type="submit">Débloquer les 10 missions</button>
+          </form>
         </div>
       </div>
     </div>
@@ -123,19 +128,33 @@ export function renderSettings(container) {
   });
 
   const btnAdmin = container.querySelector('#btn-admin');
-  if (btnAdmin) {
-    btnAdmin.addEventListener('click', () => {
-      const pwd = prompt('Veuillez entrer le mot de passe administrateur :');
-      if (pwd === 'admin123' || pwd === 'harpytech') {
-        unlockAllLevels();
-        showCustomConfirm('👑 Mode Admin activé. Tous les niveaux sont débloqués !', () => {
-          navigate('menu');
-        });
-      } else if (pwd !== null) {
-        alert('Mot de passe incorrect.');
-      }
-    });
-  }
+  const adminDialog = container.querySelector('#admin-dialog');
+  const adminPassword = container.querySelector('#admin-password');
+  const adminFeedback = container.querySelector('#admin-feedback');
+  const adminForm = container.querySelector('#admin-form');
+  const settingsContent = container.querySelector('.settings__content');
+  const closeAdminDialog = () => { adminDialog.hidden = true; settingsContent.inert = false; adminPassword.value = ''; adminFeedback.textContent = ''; btnAdmin.focus(); };
+  const openAdminDialog = () => { adminDialog.hidden = false; settingsContent.inert = true; adminPassword.focus(); };
+  const unlockAdmin = () => {
+    if (adminPassword.value !== 'admin123' && adminPassword.value !== 'harpytech') {
+      adminFeedback.textContent = 'Mot de passe incorrect.';
+      adminPassword.select();
+      return;
+    }
+    unlockAllLevels();
+    navigate('levels', { roleId: 'dietetics' });
+  };
+  btnAdmin.addEventListener('click', openAdminDialog);
+  container.querySelector('#admin-cancel').addEventListener('click', closeAdminDialog);
+  adminForm.addEventListener('submit', (event) => { event.preventDefault(); unlockAdmin(); });
+  adminDialog.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') { event.preventDefault(); closeAdminDialog(); }
+    if (event.key !== 'Tab') return;
+    const focusable = [...adminDialog.querySelectorAll('button, input')].filter((element) => !element.disabled);
+    const current = focusable.indexOf(document.activeElement);
+    const next = event.shiftKey ? (current <= 0 ? focusable.length - 1 : current - 1) : (current === focusable.length - 1 ? 0 : current + 1);
+    event.preventDefault(); focusable[next].focus();
+  });
 
   container.querySelector('#btn-save').addEventListener('click', () => {
     const newSettings = {

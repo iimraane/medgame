@@ -1127,6 +1127,19 @@ a {
     max-width: 600px;
 }
 
+.settings-admin-dialog { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(5, 17, 31, .66); backdrop-filter: blur(7px); }
+.settings-admin-dialog[hidden] { display: none; }
+.settings-admin-dialog__card { position: relative; width: min(430px, 100%); padding: 30px; border: 1px solid rgba(175, 124, 255, .5); border-radius: 20px; background: linear-gradient(145deg, #151b3b, #242052); color: #f8f6ff; box-shadow: 0 22px 70px rgba(20, 10, 59, .5), 0 0 28px rgba(157, 103, 255, .24); }
+.settings-admin-dialog__eyebrow { margin: 0 0 8px; color: #c7a8ff; font-size: .72rem; font-weight: 800; letter-spacing: .13em; }
+.settings-admin-dialog__card h2 { margin: 0 0 10px; color: #fff; }
+.settings-admin-dialog__card > p:not(.settings-admin-dialog__eyebrow):not(.settings-admin-dialog__feedback) { margin: 0 0 22px; color: #d8d4f2; line-height: 1.5; }
+.settings-admin-dialog__card label { display: block; margin-bottom: 7px; color: #eeeaff; font-size: .85rem; font-weight: 700; }
+.settings-admin-dialog__card input { box-sizing: border-box; width: 100%; padding: 12px 13px; border: 1px solid rgba(217, 202, 255, .5); border-radius: 10px; background: rgba(255,255,255,.1); color: #fff; font: inherit; }
+.settings-admin-dialog__card input:focus { outline: 3px solid rgba(180, 134, 255, .38); border-color: #dbc4ff; }
+.settings-admin-dialog__feedback { min-height: 1.3em; margin: 9px 0; color: #ffbdc9; font-size: .85rem; }
+.settings-admin-dialog__card .btn { width: 100%; margin-top: 6px; background: linear-gradient(135deg, #8c57e7, #6c49c7); }
+.settings-admin-dialog__close { position: absolute; top: 12px; right: 15px; border: 0; background: transparent; color: #e8e1ff; font-size: 1.7rem; line-height: 1; cursor: pointer; }
+
 .settings__section {
     margin-bottom: 32px;
 }

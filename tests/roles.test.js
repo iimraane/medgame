@@ -154,9 +154,19 @@ async function requestGuard(environment, headers = {}) {
 
 test('origin guard admits local Vite only in development and rejects unknown browser sources', async () => {
   assert.equal(await requestGuard('development', { origin: 'http://localhost:5173' }), 204);
+  assert.equal(await requestGuard('development', { origin: 'http://localhost:5174' }), 204);
+  assert.equal(await requestGuard('development', { origin: 'http://127.0.0.1:4173' }), 204);
+  assert.equal(await requestGuard('development', { origin: 'http://[::1]:4173' }), 204);
+  assert.equal(await requestGuard('development', { origin: 'http://localhost' }), 204);
   assert.equal(await requestGuard('production', { origin: 'http://localhost:5173' }), 403);
+  assert.equal(await requestGuard('production', { origin: 'http://localhost:5174' }), 403);
+  assert.equal(await requestGuard('development', { origin: 'http://localhost.evil.example:5173' }), 403);
+  assert.equal(await requestGuard('development', { origin: 'http://localhost:5174/game' }), 403);
   assert.equal(await requestGuard('development', { origin: 'https://untrusted.example' }), 403);
   assert.equal(await requestGuard('development', { referer: 'not a URL' }), 403);
+  assert.equal(await requestGuard('development', { referer: 'http://localhost:5174/game' }), 204);
+  assert.equal(await requestGuard('development', { referer: 'http://127.0.0.1:4173/game' }), 204);
+  assert.equal(await requestGuard('development', { referer: 'http://[::1]:4173/game' }), 204);
 });
 
 test('the campus replaces the scene with a desktop-only notice below 1024px', () => {

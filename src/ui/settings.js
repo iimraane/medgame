@@ -74,12 +74,12 @@ export function renderSettings(container) {
           <button class="settings-admin-dialog__close" id="admin-cancel" type="button" aria-label="Fermer">×</button>
           <p class="settings-admin-dialog__eyebrow">ACCÈS ADMINISTRATEUR</p>
           <h2 id="admin-dialog-title">Débloquer le parcours</h2>
-          <p id="admin-dialog-description">Le mode administrateur ouvre les dix missions de diététique sur cet appareil.</p>
+          <p id="admin-dialog-description">Le mode administrateur ouvre toutes les missions des parcours disponibles sur cet appareil.</p>
           <form id="admin-form">
             <label for="admin-password">Mot de passe</label>
             <input id="admin-password" type="password" autocomplete="off" placeholder="Mot de passe administrateur" required>
             <p class="settings-admin-dialog__feedback" id="admin-feedback" role="alert"></p>
-            <button class="btn btn--primary" id="admin-confirm" type="submit">Débloquer les 10 missions</button>
+            <button class="btn btn--primary" id="admin-confirm" type="submit">Débloquer les parcours</button>
           </form>
         </div>
       </div>
@@ -142,7 +142,7 @@ export function renderSettings(container) {
       return;
     }
     unlockAllLevels();
-    navigate('levels', { roleId: 'dietetics' });
+    navigate('hub');
   };
   btnAdmin.addEventListener('click', openAdminDialog);
   container.querySelector('#admin-cancel').addEventListener('click', closeAdminDialog);

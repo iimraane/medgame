@@ -27,12 +27,14 @@ test('mission unlocks after the preceding mission is attempted', () => {
   storage.resetAll(); const missions = getMissionsForRole('dietetics'); assert.equal(storage.isMissionUnlocked(missions[1], missions), false);
   storage.recordMissionResult(missions[0].id, { total: 75, mastery: true }); assert.equal(storage.isMissionUnlocked(missions[1], missions), true);
 });
-test('administrator unlock records campaign progress for every Dietetics mission', () => {
-  storage.resetAll(); const missions = getMissionsForRole('dietetics');
+test('administrator unlock records campaign progress for every open-role mission', () => {
+  storage.resetAll(); const missions = getMissionsForRole('dietetics'); const nursingMissions = getMissionsForRole('nursing');
   const save = storage.unlockAllLevels();
   assert.equal(save.maxUnlockedLevel, missions.length);
   assert.equal(missions.every((mission) => save.missionProgress[mission.id]?.mastered), true);
   assert.equal(missions.every((mission) => storage.isMissionUnlocked(mission, missions, save)), true);
+  assert.equal(nursingMissions.every((mission) => save.missionProgress[mission.id]?.mastered), true);
+  assert.equal(nursingMissions.every((mission) => storage.isMissionUnlocked(mission, nursingMissions, save)), true);
   storage.resetAll(); const reset = storage.loadSave();
   assert.equal(storage.isMissionUnlocked(missions[0], missions, reset), true);
   assert.equal(storage.isMissionUnlocked(missions[1], missions, reset), false);

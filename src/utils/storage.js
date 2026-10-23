@@ -1,7 +1,7 @@
 // ─── Storage Manager ─────────────────────────────────────────────
 // Handles all localStorage operations for game progress and settings.
 
-import { getMissionsForRole } from '../data/missions.js';
+import { MISSIONS, getMissionsForRole } from '../data/missions.js';
 
 const STORAGE_KEY = 'medgame_save';
 const SETTINGS_KEY = 'medgame_settings';
@@ -115,11 +115,12 @@ export function resetAll() {
     document.cookie = 'medgame_active=; max-age=0; path=/';
 }
 
-export function unlockAllLevels(missionIds = getMissionsForRole('dietetics').map((mission) => mission.id)) {
+export function unlockAllLevels(missionIds = MISSIONS.map((mission) => mission.id)) {
     const save = loadSave();
-    const knownMissionIds = new Set(getMissionsForRole('dietetics').map((mission) => mission.id));
-    save.maxUnlockedLevel = knownMissionIds.size;
-    save.legacyCampaignUnlockThrough = knownMissionIds.size;
+    const dieteticsMissionIds = new Set(getMissionsForRole('dietetics').map((mission) => mission.id));
+    const knownMissionIds = new Set(MISSIONS.map((mission) => mission.id));
+    save.maxUnlockedLevel = dieteticsMissionIds.size;
+    save.legacyCampaignUnlockThrough = dieteticsMissionIds.size;
     for (const missionId of new Set(missionIds.filter((id) => knownMissionIds.has(id)))) {
         const prior = save.missionProgress[missionId] || { attempts: 0, bestScore: 0, mastered: false };
         save.missionProgress[missionId] = { ...prior, mastered: true };

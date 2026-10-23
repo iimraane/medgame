@@ -10,7 +10,7 @@ test('administrator unlock uses an in-page dialog instead of a native prompt', (
   assert.match(source, /<form id="admin-form">/);
   assert.match(source, /aria-describedby="admin-dialog-description"/);
   assert.doesNotMatch(source, /\bprompt\s*\(/);
-  assert.match(source, /unlockAllLevels\(\);\s*\n\s*navigate\('levels', \{ roleId: 'dietetics' \}\)/);
+  assert.match(source, /unlockAllLevels\(\);\s*\n\s*navigate\('hub'\)/);
 });
 
 test('administrator dialog keeps focus in the dialog and restores it on dismissal', () => {

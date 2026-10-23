@@ -21,7 +21,7 @@ const { getRole } = await import(pathToFileURL(join(dataDir, 'roles.js')).href);
 const { MASTERY_THRESHOLD, getServerMission, evaluateServerMission, chooseArchetype, chooseVariant, getPresentation, getEligibleTools, useConsultationTool, isNursingMission, getNursingTools, useNursingTool, transcriptConfirmedSymptoms, nursingLiveSymptoms, evaluateNursingHypothesis } = await import(pathToFileURL(join(__dirname, 'missions.js')).href);
 const { getOpenAIModel, buildMissionPatientPrompt } = await import(pathToFileURL(join(__dirname, 'missionPatient.js')).href);
 const { choosePatientTraits, chooseNonVerbalCue } = await import(pathToFileURL(join(__dirname, 'patientTraits.js')).href);
-const { MISSION_EVALUATION_SCHEMA, buildMissionEvaluationPrompt, buildNursingEvaluationPrompt, normalizeMissionEvaluation } = await import(pathToFileURL(join(__dirname, 'missionEvaluation.js')).href);
+const { MISSION_EVALUATION_SCHEMA, buildMissionEvaluationPrompt, normalizeMissionEvaluation } = await import(pathToFileURL(join(__dirname, 'missionEvaluation.js')).href);
 
 // Ensure .env is loaded from the root 'game' directory
 dotenv.config({ path: join(__dirname, '..', '.env') });
@@ -388,22 +388,6 @@ app.post('/game/api/nursing-hypothesis', async (req, res) => {
     if (!session?.mission || !isNursingMission(session.mission)) return res.status(400).json({ error: 'Session Nursing invalide.' });
     let result = evaluateNursingHypothesis(session, req.body.diseaseId);
     if (result.error) return res.status(400).json(result);
-    const client = getClient();
-    if (client && session.messages.some((message) => message.role === 'user')) {
-        try {
-            const evaluation = await client.chat.completions.create({
-                model: getOpenAIModel(),
-                messages: [{ role: 'system', content: buildNursingEvaluationPrompt(session) }, ...session.messages],
-                response_format: { type: 'json_schema', json_schema: MISSION_EVALUATION_SCHEMA },
-                max_completion_tokens: 500,
-            });
-            const reviewed = normalizeMissionEvaluation(JSON.parse(evaluation.choices[0].message.content || '{}'), true);
-            if (reviewed) {
-                const total = result.correct ? reviewed.total : Math.min(55, reviewed.total);
-                result = { ...result, ...reviewed, total, mastery: result.mastery && result.correct && total >= MASTERY_THRESHOLD, safetyAcknowledged: true };
-            }
-        } catch (err) { console.error('Nursing evaluation fallback:', err.message); }
-    }
     sessions.delete(req.body.sessionId);
     res.json(result);
 });

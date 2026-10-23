@@ -180,29 +180,20 @@ export function evaluateNursingHypothesis(session, diseaseId) {
   const disease = NURSING_DISEASES[diseaseId];
   if (!disease || !session.mission.diseases.some((item) => item.id === diseaseId)) return { error: 'Hypothèse inconnue pour cette mission.' };
   const confirmed = nursingLiveSymptoms(session, session.liveSymptomIds);
-  const exploredSymptoms = confirmed;
-  const userMessages = session.messages.filter((message) => message.role === 'user').length;
   const correct = diseaseId === session.variant.diseaseId;
-  const escalationRequired = new Set(['pulmonary-embolism-pattern', 'meningitis-pattern', 'sepsis-alert-pattern']).has(session.variant.diseaseId);
-  const escalationMentioned = session.messages.some((message) => message.role === 'user' && /(?:appeler|urgence|samu|transmettre|orienter|évaluer rapidement)/i.test(message.content));
-  const scores = {
-    foodHistory: Math.min(100, exploredSymptoms.length * 34),
-    context: Math.min(100, session.usedTools.length * 25 + (userMessages >= 3 ? 25 : 0)),
-    communication: Math.min(100, userMessages * 20 + (exploredSymptoms.length >= 2 ? 20 : 0)),
-    safePlan: Math.min(100, correct ? 55 + exploredSymptoms.length * 15 : 20 + exploredSymptoms.length * 10),
-  };
-  const total = correct ? Math.round(Object.values(scores).reduce((sum, score) => sum + score, 0) / 4) : Math.min(55, Math.round(Object.values(scores).reduce((sum, score) => sum + score, 0) / 4));
+  const total = correct ? 100 : 0;
+  const scores = Object.fromEntries(AXES.map((axis) => [axis, total]));
   return {
-    correct, selectedDiseaseId: diseaseId, total, mastery: correct && total >= MASTERY_THRESHOLD && (!escalationRequired || escalationMentioned),
+    correct, selectedDiseaseId: diseaseId, total, mastery: correct,
     scores, safetyAcknowledged: true, confirmedSymptoms: confirmed.map((symptom) => symptom.id),
     evidence: {
-      foodHistory: { count: exploredSymptoms.length, message: `${exploredSymptoms.length} signe(s) explicitement recueilli(s).` },
-      context: { count: session.usedTools.length, message: `${session.usedTools.length} document(s) consulté(s), plus la chronologie dans l’échange.` },
-      communication: { count: userMessages, message: `${userMessages} question(s) ou reformulation(s) du joueur.` },
-      safePlan: { count: correct && (!escalationRequired || escalationMentioned) ? 1 : 0, message: escalationRequired && !escalationMentioned ? 'Ce scénario fictif attend une priorisation explicite avant toute maîtrise.' : correct ? 'Hypothèse cohérente pour ce cas fictif.' : 'Hypothèse à reconsidérer à partir des faits confirmés.' },
+      foodHistory: { count: confirmed.length, message: `${confirmed.length} signe(s) explicitement recueilli(s).` },
+      context: { count: session.usedTools.length, message: `${session.usedTools.length} document(s) consulté(s).` },
+      communication: { count: session.messages.filter((message) => message.role === 'user').length, message: 'Les échanges n’influencent pas la victoire.' },
+      safePlan: { count: correct ? 1 : 0, message: correct ? 'La bonne maladie a été identifiée.' : 'La maladie sélectionnée ne correspond pas au cas.' },
     },
-    improvement: escalationRequired && !escalationMentioned ? 'Dans ce scénario fictif, explicitez une transmission ou une orientation prioritaire avant de conclure.' : correct ? 'La suite consiste à expliquer les indices retenus et à vérifier ceux qui restent incertains.' : 'Reprenez la chronologie, les signes explicitement dits par le patient et les documents déjà ouverts.',
-    feedback: correct ? 'Hypothèse cohérente dans cette simulation fictive. La qualité de l’exploration compte autant que le choix final.' : 'Cette hypothèse ne correspond pas au cas fictif. Reprenez la chronologie et les faits confirmés.',
+    improvement: correct ? 'Bonne identification : le niveau suivant est déverrouillé.' : 'Rejouez cette mission pour essayer une autre maladie.',
+    feedback: correct ? 'Bonne maladie identifiée dans cette simulation fictive.' : 'La maladie choisie ne correspond pas à ce cas fictif.',
   };
 }
 export function getEligibleTools(mission) { return mission ? TOOL_DEFINITIONS.filter((tool) => mission.order >= tool.unlockOrder).map(({ id, label, kind }) => ({ id, label, kind })) : []; }

@@ -64,7 +64,7 @@ test('Nursing disease pools use distinct concrete signs and only expose the auth
   }
 });
 
-test('Nursing hypotheses score only server-collected signs and reward exploration', () => {
+test('Nursing hypotheses ignore consultation activity once the disease is selected', () => {
   const mission = NURSING_CASES['nursing-10'];
   const variant = mission.blueprints[0];
   const session = {
@@ -79,9 +79,9 @@ test('Nursing hypotheses score only server-collected signs and reward exploratio
   };
   const evaluated = evaluateNursingHypothesis(session, variant.diseaseId);
   assert.equal(evaluated.mastery, true);
-  assert.ok(evaluated.total >= MASTERY_THRESHOLD);
+  assert.equal(evaluated.total, 100);
   const rushed = evaluateNursingHypothesis({ ...session, usedTools: [], messages: [{ role: 'assistant', content: variant.symptoms[0].label }] }, variant.diseaseId);
-  assert.equal(rushed.mastery, false);
+  assert.equal(rushed.mastery, true);
   assert.equal(evaluateNursingHypothesis(session, 'forged').error, 'Hypothèse inconnue pour cette mission.');
 });
 
@@ -119,11 +119,16 @@ test('Nursing transcript fallback recognizes an explicit sign even when its word
   assert.deepEqual(nursingLiveSymptoms({ mission: NURSING_CASES['nursing-1'], variant: viralVariant, messages: session.messages }).map((symptom) => symptom.id), []);
 });
 
-test('high-alert Nursing simulations require an explicit fictional escalation before mastery', () => {
+test('Nursing mastery depends only on selecting the correct disease', () => {
   const mission = NURSING_CASES['nursing-10']; const variant = mission.blueprints.find((item) => item.diseaseId === 'sepsis-alert-pattern');
   const session = { mission, variant, usedTools: getNursingTools(mission), messages: [{ role: 'assistant', content: variant.symptoms.map((item) => item.label).join('. ') }, { role: 'user', content: 'Pouvez-vous préciser les signes et leur chronologie ?' }, { role: 'user', content: 'Je reformule ce que vous venez de dire.' }, { role: 'user', content: 'Je vais appeler et transmettre ces éléments sans attendre.' }] };
-  assert.equal(evaluateNursingHypothesis({ ...session, messages: session.messages.slice(0, -1) }, variant.diseaseId).mastery, false);
-  assert.equal(evaluateNursingHypothesis(session, variant.diseaseId).mastery, true);
+  const correct = evaluateNursingHypothesis({ ...session, messages: [] }, variant.diseaseId);
+  assert.equal(correct.mastery, true);
+  assert.equal(correct.total, 100);
+  const wrongDisease = mission.diseases.find((disease) => disease.id !== variant.diseaseId).id;
+  const incorrect = evaluateNursingHypothesis(session, wrongDisease);
+  assert.equal(incorrect.mastery, false);
+  assert.equal(incorrect.total, 0);
 });
 
 test('every mission owns six coherent private variants and avoids recent variants', () => {

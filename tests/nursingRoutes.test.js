@@ -6,7 +6,6 @@ process.env.NODE_ENV = 'test';
 const { app, sessions, setTestOpenAIClient, normalizePatientReply } = await import('../server/server.js');
 const { NURSING_DOSSIERS } = await import('../server/nursingDossiers.js');
 const { NURSING_DOCUMENT_DEFINITIONS } = await import('../server/nursingDossiers.js');
-const { buildNursingEvaluationPrompt } = await import('../server/missionEvaluation.js');
 
 async function withServer(run) {
   const server = http.createServer(app);
@@ -43,6 +42,7 @@ test('Nursing HTTP flow returns level-gated, case-authorized reusable evidence',
     assert.equal(retiredPins.status, 410);
     const result = await post('/game/api/nursing-hypothesis', { sessionId: start.body.sessionId, diseaseId: session.variant.diseaseId });
     assert.equal(result.status, 200); assert.equal(result.body.correct, true);
+    assert.equal(result.body.mastery, true); assert.equal(result.body.total, 100);
     const expired = await post('/game/api/nursing-hypothesis', { sessionId: start.body.sessionId, diseaseId: session.variant.diseaseId });
     assert.equal(expired.status, 400);
   });
@@ -151,11 +151,9 @@ test('a level 10 Nursing session exposes all five documents from only its select
     assert.equal(session.usedTools.length, 5);
     const promptAfterFirstOpen = session.prompt;
     const evidenceFacts = session.usedTools.flatMap((tool) => tool.evidence.facts);
-    const debriefPrompt = buildNursingEvaluationPrompt(session);
     for (const fact of evidenceFacts) {
       const count = (text) => text.split(fact).length - 1;
       assert.equal(count(promptAfterFirstOpen), 1, `patient prompt duplicates ${fact}`);
-      assert.equal(count(debriefPrompt), 1, `debrief prompt duplicates ${fact}`);
     }
     const reopened = await post('/game/api/consultation-tool', { sessionId: start.body.sessionId, toolId: 'nursing-document-10' });
     assert.equal(reopened.status, 200);

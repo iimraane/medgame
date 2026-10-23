@@ -98,6 +98,16 @@ test('Nursing live signs are cumulative, case-authorized, and preserve valid pin
   assert.deepEqual(nursingLiveSymptoms({ ...session, liveSymptomIds: ['invalid-id'] }, ['invalid-id']).map((symptom) => symptom.id), [variant.symptoms[0].id, variant.symptoms[2].id]);
 });
 
+test('Nursing transcript fallback excludes clear denials and only dismissal removes scoring credit', () => {
+  const mission = NURSING_CASES['nursing-1']; const variant = mission.blueprints[0];
+  const session = { mission, variant, usedTools: [], messages: [{ role: 'assistant', content: `Je n'ai pas de ${variant.symptoms[0].label}, mais ${variant.symptoms[1].label}.` }], liveSymptomIds: [variant.symptoms[2].id], symptomPins: [{ id: variant.symptoms[1].id, state: 'to-verify' }] };
+  assert.deepEqual(nursingLiveSymptoms(session).map((symptom) => symptom.id), [variant.symptoms[1].id]);
+  const defaultCredit = evaluateNursingHypothesis(session, variant.diseaseId);
+  assert.equal(defaultCredit.evidence.foodHistory.count, 2);
+  session.symptomPins = [{ id: variant.symptoms[1].id, state: 'dismissed' }];
+  assert.equal(evaluateNursingHypothesis(session, variant.diseaseId).evidence.foodHistory.count, 1);
+});
+
 test('high-alert Nursing simulations require an explicit fictional escalation before mastery', () => {
   const mission = NURSING_CASES['nursing-10']; const variant = mission.blueprints.find((item) => item.diseaseId === 'sepsis-alert-pattern');
   const session = { mission, variant, usedTools: getNursingTools(mission), messages: [{ role: 'assistant', content: variant.symptoms.map((item) => item.label).join('. ') }, { role: 'user', content: 'Pouvez-vous préciser les signes et leur chronologie ?' }, { role: 'user', content: 'Je reformule ce que vous venez de dire.' }, { role: 'user', content: 'Je vais appeler et transmettre ces éléments sans attendre.' }] };

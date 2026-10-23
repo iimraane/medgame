@@ -61,6 +61,10 @@ context: []
 
 ## Implementation Notes
 
+- Added constrained live sign extraction to the Nursing chat response with a server-authorized fallback, timeout cancellation and cumulative pin preservation.
+- Removed the empty level-one Documents rail, added hypothesis sign cards, and strengthened the dark-rail document controls.
+- Exercised the desktop Nursing consultation in the local browser: level one has no blank Documents rail, a selected hypothesis exposes its three signs, and a patient reply updates the sign rail without a manual refresh.
+
 ## Spec Change Log
 
 ## Review Triage Log
@@ -75,6 +79,13 @@ context: []
 - `medium — defer` Runtime DOM coverage for card rendering and no-document layout is absent; the project has no DOM test harness, while source contracts and the production build verify the wiring.
 - `low — false` A null patient reply no longer reaches transcript matching; the chat route rejects non-string completions before appending them.
 - `low — maybe-false` Explicit linguistic denial remains dependent on the constrained extractor rather than a French negation parser; the authored patient prompt only emits exact labels when revealing a sign.
+- `medium — patch` A selected pin excluded every other discovered sign from hypothesis scoring; only explicit dismissals now remove score credit.
+- `medium — patch` The transcript fallback treated a clear French denial as a disclosure; it now rejects the local negative formulations and has regression coverage.
+- `medium — patch` The extraction timeout returned early without cancelling the request; its abort signal now stops the pending extraction and the route test covers it.
+- `low — patch` Expanded hypothesis controls were not linked to their controlled content; they now expose `aria-controls`, and live signs are announced politely.
+- `low — false` A selected hypothesis does not need to collapse when clicked again; the approved interaction is to open it and replace it when another hypothesis is chosen.
+- `low — rejected` Runtime DOM tests are not present because the repository has no DOM harness; adding one solely for this small interaction would be disproportionate. Static contracts, the production build, and the completed live-browser walkthrough cover the current behavior.
+- `low — patch` The engine test leaked its global fetch mock; it restores the preceding value after execution.
 
 ## Design Notes
 

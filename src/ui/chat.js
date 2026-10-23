@@ -13,7 +13,7 @@ export async function renderChat(container, missionId) {
     toolsRail.innerHTML = `<h2>Documents</h2><div id="nursing-tools" class="nursing-tools"></div>`;
     const rail = document.createElement('aside');
     rail.className = 'nursing-rail nursing-rail--right';
-    rail.innerHTML = `<h2>Hypothèses</h2><div id="differential"></div><section class="nursing-card" id="disease-card" hidden></section><h2>Signes recueillis</h2><div id="symptoms" class="nursing-symptoms">Aucun signe n’a encore été formulé clairement par le patient.</div><button class="btn btn--primary nursing-submit" id="submit-hypothesis" disabled>Soumettre l’hypothèse</button>`;
+    rail.innerHTML = `<h2>Hypothèses</h2><div id="differential"></div><section class="nursing-card" id="disease-card" hidden></section><h2>Signes recueillis</h2><div id="symptoms" class="nursing-symptoms" role="status" aria-live="polite">Aucun signe n’a encore été formulé clairement par le patient.</div><button class="btn btn--primary nursing-submit" id="submit-hypothesis" disabled>Soumettre l’hypothèse</button>`;
     chatBody.classList.add('chat__body--nursing');
     chatBody.append(rail);
     let selectedDisease;
@@ -40,7 +40,7 @@ export async function renderChat(container, missionId) {
     };
     const renderNursingTools = (tools) => { const toolsNode = toolsRail.querySelector('#nursing-tools'); toolsNode.innerHTML = tools.map((tool) => `<button class="btn btn--secondary consultation-tool" data-tool="${tool.id}">${tool.label}</button>`).join(''); toolsNode.querySelectorAll('[data-tool]').forEach((button) => button.addEventListener('click', () => engine.useTool(button.dataset.tool))); };
     differential.innerHTML = data.differential.map((disease) => `<button class="nursing-disease" data-disease="${disease.id}">${disease.name}</button>`).join('');
-    differential.querySelectorAll('[data-disease]').forEach((button) => { button.setAttribute('aria-expanded', 'false'); button.addEventListener('click', () => {
+    differential.querySelectorAll('[data-disease]').forEach((button) => { button.setAttribute('aria-expanded', 'false'); button.setAttribute('aria-controls', 'disease-card'); button.addEventListener('click', () => {
       selectedDisease = button.dataset.disease; const disease = data.differential.find((item) => item.id === selectedDisease);
       differential.querySelectorAll('button').forEach((item) => item.classList.toggle('is-selected', item === button));
       differential.querySelectorAll('button').forEach((item) => item.setAttribute('aria-expanded', String(item === button)));

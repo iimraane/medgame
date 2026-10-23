@@ -142,7 +142,13 @@ export function isNursingMission(mission) { return mission?.roleId === 'nursing'
 export function chooseNursingCase(mission, recentVariantIds = [], random = Math.random) { return chooseVariant(mission, recentVariantIds, random); }
 export function getNursingTools(mission) { return NURSING_DOCUMENT_DEFINITIONS.filter(([, order]) => mission.order >= order).map(([id, , label]) => ({ id, label, kind: 'nursing-document' })); }
 export function useNursingTool(variant, toolId, used = []) { const evidence = variant?.evidence?.[toolId]; if (!evidence) return null; return { id: toolId, label: evidence.title, kind: 'nursing-document', alreadyConsulted: used.includes(toolId), evidence, promptNotes: evidence.facts }; }
-export function transcriptConfirmedSymptoms(session) { const transcript = session.messages.filter((message) => message.role === 'assistant').map((message) => String(message.content || '').toLowerCase()).join('\n'); return session.variant.symptoms.filter((symptom) => transcript.includes(symptom.label.toLowerCase())); }
+function messageAffirmsSymptom(message, label) {
+  const text = String(message.content || '').toLowerCase(); const symptom = label.toLowerCase(); const index = text.indexOf(symptom);
+  if (index < 0) return false;
+  const prefix = text.slice(Math.max(0, index - 50), index);
+  return !new RegExp(`(?:n['’]ai\\s+pas(?:\\s+de)?|ne\\s+\\w+\\s+pas(?:\\s+de)?|pas\\s+de|sans|aucun(?:e)?\\s+(?:de\\s+)?)\\s*$`, 'i').test(prefix);
+}
+export function transcriptConfirmedSymptoms(session) { return session.variant.symptoms.filter((symptom) => session.messages.some((message) => message.role === 'assistant' && messageAffirmsSymptom(message, symptom.label))); }
 export function normalizeExtractedNursingSymptoms(session, extractedIds = []) {
   if (!Array.isArray(extractedIds)) return [];
   const allowed = new Set(session.variant.symptoms.map((symptom) => symptom.id));
@@ -165,8 +171,8 @@ export function evaluateNursingHypothesis(session, diseaseId) {
   const disease = NURSING_DISEASES[diseaseId];
   if (!disease || !session.mission.diseases.some((item) => item.id === diseaseId)) return { error: 'Hypothèse inconnue pour cette mission.' };
   const confirmed = nursingLiveSymptoms(session, session.liveSymptomIds);
-  const creditedPins = (session.symptomPins || []).filter((pin) => pin.state !== 'dismissed');
-  const exploredSymptoms = creditedPins.length ? confirmed.filter((symptom) => creditedPins.some((pin) => pin.id === symptom.id)) : confirmed;
+  const dismissedIds = new Set((session.symptomPins || []).filter((pin) => pin.state === 'dismissed').map((pin) => pin.id));
+  const exploredSymptoms = confirmed.filter((symptom) => !dismissedIds.has(symptom.id));
   const userMessages = session.messages.filter((message) => message.role === 'user').length;
   const correct = diseaseId === session.variant.diseaseId;
   const escalationRequired = new Set(['pulmonary-embolism-pattern', 'meningitis-pattern', 'sepsis-alert-pattern']).has(session.variant.diseaseId);

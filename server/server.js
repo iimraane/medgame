@@ -185,7 +185,7 @@ Sois TRÈS tolérant. En cas de doute, accepte.
 
 Réponds UNIQUEMENT en JSON : {"valid": true} ou {"valid": false, "reason": "explication très courte"}`;
 
-async function extractNursingSymptomIds(client, session, patientReply) {
+async function extractNursingSymptomIds(client, session, patientReply, signal) {
     if (!client || !isNursingMission(session.mission)) return [];
     const authorized = session.variant.symptoms.map(({ id, label }) => ({ id, label }));
     try {
@@ -197,7 +197,7 @@ async function extractNursingSymptomIds(client, session, patientReply) {
             }, { role: 'user', content: patientReply }],
             response_format: { type: 'json_object' },
             max_completion_tokens: 100,
-        });
+        }, { signal });
         const parsed = JSON.parse(extraction.choices[0].message.content || '{}');
         return Array.isArray(parsed.symptomIds) ? parsed.symptomIds : [];
     } catch (err) {
@@ -206,11 +206,15 @@ async function extractNursingSymptomIds(client, session, patientReply) {
     }
 }
 
-function extractionWithTimeout(client, session, patientReply) {
-    return Promise.race([
-        extractNursingSymptomIds(client, session, patientReply),
-        new Promise((resolve) => setTimeout(() => resolve([]), 3000)),
-    ]);
+async function extractionWithTimeout(client, session, patientReply) {
+    const controller = new AbortController();
+    let timeout;
+    try {
+        return await Promise.race([
+            extractNursingSymptomIds(client, session, patientReply, controller.signal),
+            new Promise((resolve) => { timeout = setTimeout(() => { controller.abort(); resolve([]); }, 3000); }),
+        ]);
+    } finally { clearTimeout(timeout); }
 }
 
 // ─── Evaluation Feedback Builder ────────────────────────────────

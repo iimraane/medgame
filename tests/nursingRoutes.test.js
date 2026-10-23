@@ -74,6 +74,27 @@ test('Nursing chat returns cumulative authorized live signs and falls back when 
     const secondTurn = await post('/game/api/chat', { sessionId: start.body.sessionId, message: 'Et maintenant ?' });
     assert.deepEqual(secondTurn.body.nursing.symptoms.map((symptom) => symptom.id), [first.id, second.id]);
     assert.deepEqual(secondTurn.body.nursing.pins, [{ id: first.id, state: 'to-verify' }]);
+
+    const fallbackStart = await post('/game/api/start', { missionId: 'nursing-1', roleId: 'nursing' });
+    const fallbackSession = sessions.get(fallbackStart.body.sessionId); const fallbackSign = fallbackSession.variant.symptoms[2]; completion = 0;
+    setTestOpenAIClient({ chat: { completions: { create: async () => {
+      completion++; if (completion === 1) return { choices: [{ message: { content: '{"valid":true}' } }] };
+      if (completion === 2) return { choices: [{ message: { content: fallbackSign.label } }] };
+      return { choices: [{ message: { content: '{"symptomIds":["foreign-id"]}' } }] };
+    } } } });
+    const fallbackTurn = await post('/game/api/chat', { sessionId: fallbackStart.body.sessionId, message: 'Un autre signe ?' });
+    assert.deepEqual(fallbackTurn.body.nursing.symptoms.map((symptom) => symptom.id), [fallbackSign.id]);
+
+    const timeoutStart = await post('/game/api/start', { missionId: 'nursing-1', roleId: 'nursing' });
+    const timeoutSession = sessions.get(timeoutStart.body.sessionId); const timeoutSign = timeoutSession.variant.symptoms[0]; completion = 0; let aborted = false;
+    setTestOpenAIClient({ chat: { completions: { create: async (_body, options) => {
+      completion++; if (completion === 1) return { choices: [{ message: { content: '{"valid":true}' } }] };
+      if (completion === 2) return { choices: [{ message: { content: timeoutSign.label } }] };
+      return new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => { aborted = true; reject(new Error('aborted')); }));
+    } } } });
+    const timeoutTurn = await post('/game/api/chat', { sessionId: timeoutStart.body.sessionId, message: 'Encore ?' });
+    assert.equal(aborted, true);
+    assert.deepEqual(timeoutTurn.body.nursing.symptoms.map((symptom) => symptom.id), [timeoutSign.id]);
   });
 });
 

@@ -95,6 +95,10 @@ function getClient() {
     return new OpenAI({ apiKey: key });
 }
 
+export function normalizePatientReply(reply) {
+    return String(reply).replace(/\s*(?:—|--)\s*/g, ', ');
+}
+
 // ─── Patient Name Generator ─────────────────────────────────────
 function generatePatientName() {
     const firstNamesMale = ['Jean', 'Pierre', 'Michel', 'Mohamed', 'Patrick', 'Olivier', 'Thomas', 'Marc', 'Antoine', 'Karim', 'Nicolas', 'François', 'Youssef', 'Bruno', 'Julien', 'Mathieu', 'Lucas', 'Hugo', 'Romain', 'Adrien'];
@@ -460,8 +464,9 @@ app.post('/game/api/chat', async (req, res) => {
             max_completion_tokens: 500,
         });
 
-        const response = completion.choices[0].message.content;
-        if (typeof response !== 'string') throw new Error('Réponse patient invalide.');
+        const rawResponse = completion.choices[0].message.content;
+        if (typeof rawResponse !== 'string') throw new Error('Réponse patient invalide.');
+        const response = normalizePatientReply(rawResponse);
         session.messages.push({ role: 'assistant', content: response });
         if (session.mission) session.interactionEvents.push({ type: 'validated-patient-turn', axes: session.interactionEvents.length ? ['context', 'safePlan'] : ['foodHistory', 'communication'] });
         session.messageCount++;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 
 process.env.NODE_ENV = 'test';
-const { app, sessions, setTestOpenAIClient } = await import('../server/server.js');
+const { app, sessions, setTestOpenAIClient, normalizePatientReply } = await import('../server/server.js');
 const { NURSING_DOSSIERS } = await import('../server/nursingDossiers.js');
 const { NURSING_DOCUMENT_DEFINITIONS } = await import('../server/nursingDossiers.js');
 const { buildNursingEvaluationPrompt } = await import('../server/missionEvaluation.js');
@@ -47,6 +47,11 @@ test('Nursing HTTP flow returns level-gated, case-authorized reusable evidence a
     const expired = await post('/game/api/nursing-hypothesis', { sessionId: start.body.sessionId, diseaseId: session.variant.diseaseId });
     assert.equal(expired.status, 400);
   });
+});
+
+test('patient replies normalize long and double dashes without changing ordinary punctuation', () => {
+  assert.equal(normalizePatientReply('Je suis fatigué — surtout le soir -- après le travail.'), 'Je suis fatigué, surtout le soir, après le travail.');
+  assert.equal(normalizePatientReply('Je suis fatigué, surtout le soir.'), 'Je suis fatigué, surtout le soir.');
 });
 
 test('Nursing chat returns cumulative authorized live signs and falls back when extraction is invalid', async () => {

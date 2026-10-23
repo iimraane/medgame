@@ -7,6 +7,7 @@ import { NURSING_POOL_SIZES } from '../src/data/nursingCampaign.js';
 import { NURSING_DISEASES } from '../src/data/nursingCampaign.js';
 import { NURSING_DOSSIERS, NURSING_DOCUMENT_DEFINITIONS } from '../server/nursingDossiers.js';
 import { buildMissionEvaluationPrompt, normalizeMissionEvaluation } from '../server/missionEvaluation.js';
+import { buildMissionPatientPrompt } from '../server/missionPatient.js';
 import { nextRecentVariantIds } from '../src/utils/storage.js';
 
 test('the browser exposes ten ordered cards per open campaign', () => {
@@ -223,6 +224,22 @@ test('patient style and specialized tool presentation stay in the private and vi
   assert.doesNotMatch(chatSource, /refresh-symptoms/);
   assert.match(styleSource, /chat__body--nursing-no-documents/);
   assert.doesNotMatch(chatSource, /Prévoir une prochaine étape sûre/);
+});
+
+test('patient prompts require natural spoken French without consultation meta-commentary', () => {
+  const nursingVariant = NURSING_CASES['nursing-1'].blueprints[0];
+  const dieteticsVariant = CASES['dietetics-rhythm-overflow'].blueprints[0];
+  const nursingPrompt = buildMissionPatientPrompt(nursingVariant, 'direct', [], []);
+  const dieteticsPrompt = buildMissionPatientPrompt(dieteticsVariant, 'direct', [], []);
+  for (const prompt of [nursingPrompt, dieteticsPrompt]) {
+    assert.match(prompt, /Tu parles comme une vraie personne/);
+    assert.match(prompt, /N’utilise jamais le tiret long/);
+  }
+  assert.match(nursingPrompt, /Ne commente jamais la mécanique de l’échange/);
+  assert.match(nursingPrompt, /sans expliquer comment obtenir la suite des informations/);
+  assert.match(nursingPrompt, new RegExp(nursingVariant.responseStyle));
+  assert.match(dieteticsPrompt, /sans demander à la personne de poser la bonne question/);
+  assert.match(dieteticsPrompt, new RegExp(dieteticsVariant.responseStyle));
 });
 
 test('consultation modal is hidden until a support is opened', () => {

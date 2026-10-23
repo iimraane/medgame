@@ -16,7 +16,7 @@ export async function renderChat(container, missionId) {
     toolsRail.innerHTML = `<h2>Documents</h2><div id="nursing-tools" class="nursing-tools"></div>`;
     const rail = document.createElement('aside');
     rail.className = 'nursing-rail nursing-rail--right';
-    rail.innerHTML = `<h2>Hypothèses</h2><div id="differential"></div><h2>Signes recueillis</h2><div id="symptoms" class="nursing-symptoms" role="status" aria-live="polite">Aucun signe n’a encore été formulé clairement par le patient.</div><button class="btn btn--primary nursing-submit" id="submit-hypothesis" disabled>Soumettre l’hypothèse</button>`;
+    rail.innerHTML = `<h2>Hypothèses</h2><p class="nursing-hypothesis-hint" id="nursing-hypothesis-hint">Clique pour consulter. Maintiens pour sélectionner.</p><p class="sr-only" id="nursing-selection-status" role="status" aria-live="polite"></p><div id="differential"></div><h2>Signes recueillis</h2><div id="symptoms" class="nursing-symptoms" role="status" aria-live="polite">Aucun signe n’a encore été formulé clairement par le patient.</div><button class="btn btn--primary nursing-submit" id="submit-hypothesis" disabled>Soumettre l’hypothèse</button>`;
     chatBody.classList.add('chat__body--nursing');
     chatBody.append(rail);
     let selectedDisease;
@@ -31,14 +31,41 @@ export async function renderChat(container, missionId) {
       });
     };
     const renderNursingTools = (tools) => { const toolsNode = toolsRail.querySelector('#nursing-tools'); toolsNode.innerHTML = tools.map((tool) => `<button class="btn btn--secondary consultation-tool" data-tool="${tool.id}">${tool.label}</button>`).join(''); toolsNode.querySelectorAll('[data-tool]').forEach((button) => button.addEventListener('click', () => engine.useTool(button.dataset.tool))); };
-    differential.innerHTML = data.differential.map((disease) => `<button class="nursing-disease" data-disease="${disease.id}">${disease.name}</button>`).join('');
-    differential.querySelectorAll('[data-disease]').forEach((button) => { button.setAttribute('aria-haspopup', 'dialog'); button.addEventListener('click', () => {
+    differential.innerHTML = data.differential.map((disease) => `<button class="nursing-disease" data-disease="${disease.id}" aria-pressed="false" aria-describedby="nursing-hypothesis-hint"><span class="nursing-disease__label">${disease.name}</span></button>`).join('');
+    const selectionStatus = rail.querySelector('#nursing-selection-status');
+    const selectDisease = (button) => {
       selectedDisease = button.dataset.disease; const disease = data.differential.find((item) => item.id === selectedDisease);
       if (!disease) { selectedDisease = undefined; rail.querySelector('#submit-hypothesis').disabled = true; return; }
-      differential.querySelectorAll('button').forEach((item) => item.classList.toggle('is-selected', item === button));
-      showDiseaseDetails(disease, button);
+      differential.querySelectorAll('button').forEach((item) => { const isSelected = item === button; item.classList.toggle('is-selected', isSelected); item.setAttribute('aria-pressed', String(isSelected)); });
       rail.querySelector('#submit-hypothesis').disabled = false;
-    }); });
+      selectionStatus.textContent = `${disease.name} est sélectionnée. Vous pouvez maintenant soumettre l’hypothèse.`;
+    };
+    let holdTimer; let holdFrame; let heldButton; let suppressClickFor;
+    const cancelForWindowBlur = () => cancelHold();
+    const cancelHold = () => { clearTimeout(holdTimer); cancelAnimationFrame(holdFrame); window.removeEventListener('blur', cancelForWindowBlur); if (heldButton) { heldButton.classList.remove('is-holding'); heldButton.style.removeProperty('--hold-progress'); } heldButton = undefined; };
+    const beginHold = (button, event) => {
+      if (event.button !== undefined && event.button !== 0) return;
+      cancelHold(); heldButton = button; button.classList.add('is-holding');
+      window.addEventListener('blur', cancelForWindowBlur);
+      const startedAt = performance.now();
+      const animate = (now) => { if (heldButton !== button) return; button.style.setProperty('--hold-progress', String(Math.min(1, (now - startedAt) / 850))); holdFrame = requestAnimationFrame(animate); };
+      holdFrame = requestAnimationFrame(animate);
+      holdTimer = setTimeout(() => { if (heldButton !== button) return; cancelHold(); selectDisease(button); suppressClickFor = button; }, 850);
+    };
+    differential.querySelectorAll('[data-disease]').forEach((button) => {
+      button.setAttribute('aria-haspopup', 'dialog');
+      button.addEventListener('pointerdown', (event) => beginHold(button, event));
+      button.addEventListener('pointerup', () => { cancelHold(); if (suppressClickFor === button) setTimeout(() => { if (suppressClickFor === button) suppressClickFor = undefined; }, 0); });
+      ['pointercancel', 'pointerleave', 'lostpointercapture', 'blur'].forEach((name) => button.addEventListener(name, () => { cancelHold(); if (suppressClickFor === button) suppressClickFor = undefined; }));
+      button.addEventListener('keydown', (event) => { if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) { event.preventDefault(); beginHold(button, event); } });
+      button.addEventListener('keyup', (event) => {
+        if (event.key !== ' ' && event.key !== 'Enter') return;
+        event.preventDefault(); const wasHeld = heldButton === button; cancelHold();
+        if (suppressClickFor === button) { suppressClickFor = undefined; return; }
+        if (wasHeld) { const disease = data.differential.find((item) => item.id === button.dataset.disease); if (disease) showDiseaseDetails(disease, button); }
+      });
+      button.addEventListener('click', (event) => { if (heldButton === button || suppressClickFor === button) { event.preventDefault(); suppressClickFor = undefined; return; } const disease = data.differential.find((item) => item.id === button.dataset.disease); if (disease) showDiseaseDetails(disease, button); });
+    });
     if (data.tools?.length) { renderNursingTools(data.tools); engine.onTools = renderNursingTools; } else { toolsRail.remove(); chatBody.classList.add('chat__body--nursing-no-documents'); }
     engine.onNursingSymptoms = (found) => renderSymptoms(found);
     rail.querySelector('#submit-hypothesis').addEventListener('click', () => engine.submitNursingHypothesis(selectedDisease));

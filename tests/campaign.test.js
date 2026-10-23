@@ -292,3 +292,21 @@ test('Nursing UI keeps signs display-only and opens disease details in the consu
   assert.match(chatSource, /nursing-disease-modal__symptom/);
   assert.match(chatSource, /displaySymptom/);
 });
+
+test('Nursing hypotheses separate a short-click information popup from a held selection', () => {
+  const chatSource = fs.readFileSync(new URL('../src/ui/chat.js', import.meta.url), 'utf8');
+  const styleSource = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+  assert.match(chatSource, /pointerdown/);
+  assert.match(chatSource, /pointerleave/);
+  assert.match(chatSource, /lostpointercapture/);
+  assert.match(chatSource, /window\.addEventListener\('blur', cancelForWindowBlur\)/);
+  assert.match(chatSource, /event\.preventDefault\(\)/);
+  assert.match(chatSource, /setTimeout\(\(\) => \{/);
+  assert.match(chatSource, /suppressClickFor === button/);
+  assert.match(chatSource, /showDiseaseDetails\(disease, button\)/);
+  assert.match(chatSource, /selectDisease\(button\)/);
+  assert.match(styleSource, /--hold-progress/);
+  assert.match(styleSource, /nursing-hypothesis-hint/);
+  assert.match(chatSource, /aria-describedby="nursing-hypothesis-hint"/);
+  assert.match(chatSource, /nursing-selection-status/);
+});

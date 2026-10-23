@@ -230,30 +230,53 @@ export function getNursingDossier(id) {
 }
 
 const CASE_CONTEXTS = Object.freeze([
-  { date: 'le 8 octobre', slot: '08 h 20', setting: 'après une matinée de cours' },
-  { date: 'le 11 octobre', slot: '11 h 45', setting: 'au retour du travail' },
-  { date: 'le 14 octobre', slot: '14 h 10', setting: 'après un trajet habituel' },
-  { date: 'le 17 octobre', slot: '16 h 35', setting: 'en fin de journée' },
-  { date: 'le 20 octobre', slot: '09 h 05', setting: 'après une nuit écourtée' },
-  { date: 'le 23 octobre', slot: '18 h 15', setting: 'avant le dîner' },
+  { slot: '08 h 20', setting: 'après une matinée de cours' },
+  { slot: '11 h 45', setting: 'au retour du travail' },
+  { slot: '14 h 10', setting: 'après un trajet habituel' },
+  { slot: '16 h 35', setting: 'en fin de journée' },
+  { slot: '09 h 05', setting: 'après une nuit écourtée' },
+  { slot: '18 h 15', setting: 'avant le dîner' },
 ]);
+
+const CASE_VALUE_OFFSETS = [-2, -1, 0, 1, 2, 3];
+function varyOneMeasurement(facts, variantIndex) {
+  const offset = CASE_VALUE_OFFSETS[Math.abs(Number(variantIndex) || 0) % CASE_VALUE_OFFSETS.length];
+  let changed = false;
+  return facts.map((fact) => {
+    if (changed) return fact;
+    const match = fact.match(/(\d+)(,\d+)?(?=\s*(?:°C|%|g\/L|G\/L|mg\/L|µg\/L|mmol\/L|µmol\/L|mUI\/L|pmol\/L|pg\/mL|ng\/mL|fL|mm|UI\/L|cm|par minute))/);
+    if (!match) return fact;
+    const value = Number(`${match[1]}.${(match[2] || '').slice(1)}`);
+    const step = fact.includes('°C') ? .1 : match[2] ? (value < 5 ? .02 : value < 20 ? .2 : 1) : value < 100 ? 1 : 2;
+    const decimals = match[2]?.length - 1 || 0;
+    const replacement = (value + offset * step).toFixed(decimals).replace('.', ',');
+    changed = true;
+    return fact.replace(match[0], replacement);
+  });
+}
 
 // A deterministic case layer ensures replaying a condition exposes a
 // different authored context while preserving the underlying evidence.
 export function materializeNursingDossier(id, variantIndex = 0) {
   const dossier = getNursingDossier(id);
   if (!dossier) return null;
-  const context = CASE_CONTEXTS[Math.abs(Number(variantIndex) || 0) % CASE_CONTEXTS.length];
+  const numericVariant = Number(variantIndex);
+  const caseIndex = Number.isFinite(numericVariant) ? Math.abs(Math.trunc(numericVariant)) % CASE_CONTEXTS.length : 0;
+  const context = CASE_CONTEXTS[caseIndex];
+  const visitFact = dossier['nursing-document-2']?.facts?.[0] || '';
+  const recordId = visitFact.match(/Dossier ([A-Z]+-\d+)/)?.[1] || 'CONSULTATION';
+  const recordDate = visitFact.match(/ouvert (le \d+ octobre)/)?.[1] || 'le 17 octobre';
+  const visitId = `${recordId}-V${caseIndex + 1}`;
   const contextualFacts = {
-    'nursing-document-2': `Arrivée enregistrée ${context.date} à ${context.slot}, ${context.setting}.`,
-    'nursing-document-4': `Mesure notée ${context.date} à ${context.slot}, ${context.setting}.`,
-    'nursing-document-6': `Prélèvement horodaté ${context.date} à ${context.slot}, ${context.setting}.`,
-    'nursing-document-8': `Observation consignée ${context.date} à ${context.slot}, ${context.setting}.`,
-    'nursing-document-10': `Transmission datée ${context.date} à ${context.slot}, ${context.setting}.`,
+    'nursing-document-2': `Visite ${visitId} enregistrée ${recordDate} à ${context.slot}, ${context.setting}.`,
+    'nursing-document-4': `Constantes de la visite ${visitId} relevées ${recordDate} à ${context.slot}, ${context.setting}.`,
+    'nursing-document-6': `Prélèvement de la visite ${visitId} horodaté ${recordDate} à ${context.slot}, ${context.setting}.`,
+    'nursing-document-8': `Observation de la visite ${visitId} consignée ${recordDate} à ${context.slot}, ${context.setting}.`,
+    'nursing-document-10': `Transmission de la visite ${visitId} datée ${recordDate} à ${context.slot}, ${context.setting}.`,
   };
   return Object.fromEntries(Object.entries(dossier).map(([documentId, document]) => [documentId, {
     title: document.title,
-    facts: [...document.facts, contextualFacts[documentId]],
+    facts: [...(['nursing-document-4', 'nursing-document-6'].includes(documentId) ? varyOneMeasurement(document.facts, caseIndex) : document.facts), contextualFacts[documentId]],
   }]));
 }
 

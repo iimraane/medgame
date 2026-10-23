@@ -42,27 +42,32 @@ export async function renderChat(container, missionId) {
     };
     const HOLD_DURATION = 850;
     const HOLD_MOVE_TOLERANCE = 12;
-    let holdTimer; let holdFrame; let heldButton; let heldPointerId; let holdOrigin; let suppressClickFor; let suppressClickPointerId; let suppressClickCleanup;
-    const clearSuppressedClick = () => { clearTimeout(suppressClickCleanup); suppressClickFor = undefined; suppressClickPointerId = undefined; };
-    const expireSuppressionAfterPointerUp = (event) => {
-      if (suppressClickFor && event.pointerId === suppressClickPointerId) {
-        clearTimeout(suppressClickCleanup);
-        suppressClickCleanup = setTimeout(clearSuppressedClick, 0);
-      }
+    let holdTimer; let holdFrame; let holdVisualCleanup; let heldButton; let heldPointerId; let holdOrigin; let suppressClickFor; let suppressClickPointerId; let suppressClickCleanup;
+    const clearHoldVisual = (button) => { clearTimeout(holdVisualCleanup); button?.classList.remove('is-holding', 'is-hold-complete'); button?.style.removeProperty('--hold-progress'); };
+    const clearSuppressedClick = () => { clearTimeout(suppressClickCleanup); window.removeEventListener('pointerup', completePointerSuppression); window.removeEventListener('pointercancel', completePointerSuppression); suppressClickFor = undefined; suppressClickPointerId = undefined; };
+    const completePointerSuppression = (event) => {
+      if (!suppressClickFor || event.pointerId !== suppressClickPointerId) return;
+      if (event.type === 'pointerup') { clearTimeout(suppressClickCleanup); suppressClickCleanup = setTimeout(clearSuppressedClick, 0); }
+      else clearSuppressedClick();
+    };
+    const suppressCompletedClick = (button, pointerId) => {
+      clearSuppressedClick(); suppressClickFor = button; suppressClickPointerId = pointerId;
+      if (pointerId !== undefined) { window.addEventListener('pointerup', completePointerSuppression); window.addEventListener('pointercancel', completePointerSuppression); }
+      suppressClickCleanup = setTimeout(clearSuppressedClick, 900);
     };
     const cancelForWindowBlur = () => cancelHold();
     const cancelHold = () => {
       clearTimeout(holdTimer); cancelAnimationFrame(holdFrame); window.removeEventListener('blur', cancelForWindowBlur);
       if (heldButton) {
         if (heldPointerId !== undefined && heldButton.hasPointerCapture?.(heldPointerId)) heldButton.releasePointerCapture(heldPointerId);
-        heldButton.classList.remove('is-holding'); heldButton.style.removeProperty('--hold-progress');
+        clearHoldVisual(heldButton);
       }
       heldButton = undefined; heldPointerId = undefined; holdOrigin = undefined;
     };
     const beginHold = (button, event) => {
       if (event.button !== undefined && event.button !== 0) return;
       if (event.isPrimary === false || heldButton) return;
-      heldButton = button; heldPointerId = event.pointerId; holdOrigin = { x: event.clientX, y: event.clientY }; button.classList.add('is-holding');
+      clearHoldVisual(button); heldButton = button; heldPointerId = event.pointerId; holdOrigin = { x: event.clientX, y: event.clientY }; button.classList.add('is-holding');
       if (event.pointerId !== undefined) button.setPointerCapture?.(event.pointerId);
       window.addEventListener('blur', cancelForWindowBlur);
       const startedAt = performance.now();
@@ -71,7 +76,12 @@ export async function renderChat(container, missionId) {
       holdTimer = setTimeout(() => {
         if (heldButton !== button) return;
         const completedPointerId = heldPointerId;
-        cancelHold(); selectDisease(button); suppressClickFor = button; suppressClickPointerId = completedPointerId;
+        clearTimeout(holdTimer); cancelAnimationFrame(holdFrame); window.removeEventListener('blur', cancelForWindowBlur);
+        heldButton = undefined; heldPointerId = undefined; holdOrigin = undefined;
+        if (completedPointerId !== undefined && button.hasPointerCapture?.(completedPointerId)) button.releasePointerCapture(completedPointerId);
+        button.classList.remove('is-holding'); button.classList.add('is-hold-complete'); button.style.setProperty('--hold-progress', '1');
+        holdVisualCleanup = setTimeout(() => clearHoldVisual(button), 220);
+        selectDisease(button); suppressCompletedClick(button, completedPointerId);
       }, HOLD_DURATION);
     };
     differential.querySelectorAll('[data-disease]').forEach((button) => {
@@ -81,10 +91,7 @@ export async function renderChat(container, missionId) {
         if (heldButton !== button || heldPointerId !== event.pointerId || !holdOrigin) return;
         if (Math.hypot(event.clientX - holdOrigin.x, event.clientY - holdOrigin.y) > HOLD_MOVE_TOLERANCE) cancelHold();
       });
-      button.addEventListener('pointerup', (event) => {
-        if (heldButton === button && heldPointerId === event.pointerId) cancelHold();
-        expireSuppressionAfterPointerUp(event);
-      });
+      button.addEventListener('pointerup', (event) => { if (heldButton === button && heldPointerId === event.pointerId) cancelHold(); });
       button.addEventListener('pointerleave', (event) => { if (heldButton === button && heldPointerId === event.pointerId && !button.hasPointerCapture?.(event.pointerId)) cancelHold(); });
       ['pointercancel', 'lostpointercapture'].forEach((name) => button.addEventListener(name, (event) => { if (heldButton === button && heldPointerId === event.pointerId) cancelHold(); }));
       button.addEventListener('blur', cancelHold);
@@ -92,7 +99,7 @@ export async function renderChat(container, missionId) {
       button.addEventListener('keyup', (event) => {
         if (event.key !== ' ' && event.key !== 'Enter') return;
         event.preventDefault(); const wasHeld = heldButton === button; cancelHold();
-        if (suppressClickFor === button) { clearSuppressedClick(); return; }
+        if (suppressClickFor === button && suppressClickPointerId === undefined) return;
         if (wasHeld) { const disease = data.differential.find((item) => item.id === button.dataset.disease); if (disease) showDiseaseDetails(disease, button); }
       });
       button.addEventListener('click', (event) => {

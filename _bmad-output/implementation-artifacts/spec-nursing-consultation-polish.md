@@ -91,3 +91,17 @@ baseline_commit: 'fc0634a'
 | Blind 11 / Verification 2: source-only interaction contract | medium | Regex checks cannot demonstrate short-click, completion, or cancellation outcomes. Defer: the suite has no DOM harness and adding one is not a trivial patch. |
 | Verification 1: incomplete catalogue evidence test | medium | Same root cause as Blind 10. Patch. |
 | Verification 3: source-only debrief test | medium | Regex checks do not render the result UI. Defer: the suite has no DOM harness and adding one is not a trivial patch. |
+| Blind 1: stale pointer suppression outside the card | high | Fixed: completion is now observed on the matching pointer globally and cancellation clears suppression. |
+| Blind 2: keyboard completion reopens the popup | high | Fixed: keyboard keyup preserves suppression until its synthetic click is consumed. |
+| Blind 3: delayed compatibility click can bypass a zero-delay cleanup | medium | Fixed: the matching click owns suppression removal and a 900 ms fallback only prevents stale state. |
+| Blind 4: completion fill disappears immediately | low | Fixed: the full fill and completion glow persist for 220 ms before cleanup. |
+| Blind 5: replay documents share the same record identifier | medium | Fixed: each materialized dossier adds a deterministic visit identifier tied to its case index. |
+| Blind 6: generated time can precede the dossier date | medium | Fixed: all materialized visit entries use the dossier’s own recorded date. |
+| Blind 7: replay variation is only contextual | high | Fixed: one bounded, existing measurement in the constants or biology record now varies per replay, alongside the case visit data. |
+| Blind 8: fixed six-context cycle could diverge in a future expansion | low | Rejected: the authored campaign explicitly creates six replay blueprints and the current bounded cycle preserves that contract. |
+| Blind 9: Nursing rail is hidden on small screens | false | The product intentionally blocks play below desktop width; mobile has no supported completion path. |
+| Blind 10: interaction and debrief tests need a DOM runtime | medium | Deferred in `deferred-work.md`; the current Node runner cannot render or dispatch these browser interactions. |
+| Edge 1: pointer release outside a released capture leaves suppression stale | high | Fixed with the same global matching-pointer completion path as Blind 1. |
+| Verification 1: actual playable blueprints are not checked for distinct evidence | medium | Fixed: every disease’s six mission blueprints now have explicit unlocked-evidence variation assertions. |
+| Verification 2: pointer outcomes have source-only coverage | medium | Deferred in `deferred-work.md`; a browser/DOM harness is needed for executable input event coverage. |
+| Verification 3: game-result debrief has source-only coverage | medium | Deferred in `deferred-work.md`; a browser/DOM harness is needed to render and activate its controls. |

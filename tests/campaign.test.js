@@ -67,6 +67,7 @@ test('Nursing disease pools use distinct concrete signs and only expose the auth
 test('Nursing documents are concrete, case-bound, and do not reveal a diagnosis', () => {
   for (const diseaseId of Object.keys(NURSING_DISEASES)) {
     const variants = Array.from({ length: 6 }, (_, index) => materializeNursingDossier(diseaseId, index));
+    let hasMeasurementVariation = false;
     for (const documentId of NURSING_DOCUMENT_DEFINITIONS.map(([id]) => id)) {
       const factSets = variants.map((dossier) => dossier[documentId].facts);
       assert.equal(new Set(factSets.map((facts) => JSON.stringify(facts))).size, 6, `${diseaseId}/${documentId} varies by case`);
@@ -74,7 +75,32 @@ test('Nursing documents are concrete, case-bound, and do not reveal a diagnosis'
         const text = facts.join(' ');
         assert.doesNotMatch(text, /ficti(?:f|ve)/i);
         assert.doesNotMatch(text, new RegExp(NURSING_DISEASES[diseaseId].name, 'i'));
-        assert.match(facts.at(-1), /(Arrivée enregistrée|Mesure notée|Prélèvement horodaté|Observation consignée|Transmission datée)/);
+        assert.match(facts.at(-1), /visite [A-Z]+-\d+-V[1-6]/i);
+      }
+      if (['nursing-document-4', 'nursing-document-6'].includes(documentId)) {
+        hasMeasurementVariation ||= new Set(factSets.map((facts) => facts.slice(0, -1).join(' '))).size === 6;
+      }
+    }
+    assert.equal(hasMeasurementVariation, true, `${diseaseId} varies at least one measurement across cases`);
+  }
+});
+
+test('Nursing mission blueprints retain distinct, case-bound unlocked dossier evidence', () => {
+  for (const mission of Object.values(NURSING_CASES)) {
+    const unlockedDocumentIds = NURSING_DOCUMENT_DEFINITIONS.filter(([, unlock]) => mission.order >= unlock).map(([id]) => id);
+    for (const disease of mission.diseases) {
+      const blueprints = mission.blueprints.filter((blueprint) => blueprint.diseaseId === disease.id);
+      assert.equal(blueprints.length, 6, `${mission.id}/${disease.id} has six replays`);
+      for (const documentId of unlockedDocumentIds) {
+        const evidence = blueprints.map((blueprint) => blueprint.evidence[documentId]);
+        assert.ok(evidence.every(Boolean), `${mission.id}/${disease.id}/${documentId} is unlocked`);
+        assert.equal(new Set(evidence.map((document) => JSON.stringify(document.facts))).size, 6, `${mission.id}/${disease.id}/${documentId} is case-bound`);
+        for (const document of evidence) {
+          const text = document.facts.join(' ');
+          assert.doesNotMatch(text, /ficti(?:f|ve)/i);
+          assert.doesNotMatch(text, new RegExp(disease.name, 'i'));
+          assert.match(document.facts.at(-1), /visite [A-Z]+-\d+-V[1-6]/i);
+        }
       }
     }
   }

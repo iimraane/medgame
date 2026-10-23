@@ -187,8 +187,13 @@ test('the AI debrief receives full server context and alone can award mastery', 
 test('patient style and specialized tool presentation stay in the private and visual paths', () => {
   const patientSource = fs.readFileSync(new URL('../server/missionPatient.js', import.meta.url), 'utf8');
   const chatSource = fs.readFileSync(new URL('../src/ui/chat.js', import.meta.url), 'utf8');
+  const styleSource = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
   assert.match(patientSource, /variant\.responseStyle/);
   assert.match(chatSource, /consultation-evidence--\$\{tool\.kind\}/);
+  assert.match(chatSource, /nursing-tools-rail/);
+  assert.match(chatSource, /chatBody\.classList\.add\('chat__body--nursing'\)/);
+  assert.match(chatSource, /chatBody\.append\(rail\)/);
+  assert.match(styleSource, /\.career-chat \.chat__body--nursing \{ grid-template-columns: minmax\(220px, 250px\) minmax\(0, 1fr\) minmax\(270px, 320px\); \}/);
   assert.doesNotMatch(chatSource, /Prévoir une prochaine étape sûre/);
 });
 

@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { MISSIONS } from '../src/data/missions.js';
-import { CASES, NURSING_CASES, MASTERY_THRESHOLD, chooseVariant, getEligibleTools, useConsultationTool, getNursingTools, useNursingTool, nursingLiveSymptoms, sanitizeNursingPins, evaluateNursingHypothesis, evaluateServerMission } from '../server/missions.js';
+import { CASES, NURSING_CASES, MASTERY_THRESHOLD, chooseVariant, getEligibleTools, useConsultationTool, getNursingTools, useNursingTool, nursingLiveSymptoms, evaluateNursingHypothesis, evaluateServerMission } from '../server/missions.js';
 import { NURSING_POOL_SIZES } from '../src/data/nursingCampaign.js';
 import { NURSING_DISEASES } from '../src/data/nursingCampaign.js';
 import { NURSING_DOSSIERS, NURSING_DOCUMENT_DEFINITIONS } from '../server/nursingDossiers.js';
 import { buildMissionEvaluationPrompt, normalizeMissionEvaluation } from '../server/missionEvaluation.js';
 import { buildMissionPatientPrompt } from '../server/missionPatient.js';
+import { PATIENT_TRAITS } from '../server/patientTraits.js';
 import { nextRecentVariantIds } from '../src/utils/storage.js';
 
 test('the browser exposes ten ordered cards per open campaign', () => {
@@ -63,7 +64,7 @@ test('Nursing disease pools use distinct concrete signs and only expose the auth
   }
 });
 
-test('Nursing pins only retain symptoms actually stated by the patient and hypotheses reward exploration', () => {
+test('Nursing hypotheses score only server-collected signs and reward exploration', () => {
   const mission = NURSING_CASES['nursing-10'];
   const variant = mission.blueprints[0];
   const session = {
@@ -76,7 +77,6 @@ test('Nursing pins only retain symptoms actually stated by the patient and hypot
       { role: 'user', content: 'Pouvez-vous préciser ce signe ?' },
     ],
   };
-  assert.deepEqual(sanitizeNursingPins(session, [{ id: variant.symptoms[0].id, state: 'confirmed' }, { id: 'forged', state: 'confirmed' }, { id: variant.symptoms[1].id, state: 'to-verify' }]), [{ id: variant.symptoms[0].id, state: 'confirmed' }, { id: variant.symptoms[1].id, state: 'to-verify' }]);
   const evaluated = evaluateNursingHypothesis(session, variant.diseaseId);
   assert.equal(evaluated.mastery, true);
   assert.ok(evaluated.total >= MASTERY_THRESHOLD);
@@ -85,28 +85,38 @@ test('Nursing pins only retain symptoms actually stated by the patient and hypot
   assert.equal(evaluateNursingHypothesis(session, 'forged').error, 'Hypothèse inconnue pour cette mission.');
 });
 
-test('Nursing live signs are cumulative, case-authorized, and preserve valid pins', () => {
+test('Nursing live signs are cumulative and case-authorized', () => {
   const mission = NURSING_CASES['nursing-1'];
   const variant = mission.blueprints[0];
   const foreign = mission.blueprints.find((candidate) => candidate.diseaseId !== variant.diseaseId).symptoms[0];
   const session = { mission, variant, messages: [{ role: 'assistant', content: variant.symptoms[0].label }], liveSymptomIds: [variant.symptoms[1].id, foreign.id] };
   assert.deepEqual(nursingLiveSymptoms(session, session.liveSymptomIds).map((symptom) => symptom.id), [variant.symptoms[0].id, variant.symptoms[1].id]);
-  session.symptomPins = sanitizeNursingPins(session, [{ id: variant.symptoms[0].id, state: 'confirmed' }]);
   session.messages.push({ role: 'assistant', content: variant.symptoms[2].label });
   session.liveSymptomIds.push(variant.symptoms[2].id);
   assert.deepEqual(nursingLiveSymptoms(session, session.liveSymptomIds).map((symptom) => symptom.id), variant.symptoms.map((symptom) => symptom.id));
-  assert.deepEqual(sanitizeNursingPins(session, session.symptomPins), [{ id: variant.symptoms[0].id, state: 'confirmed' }]);
   assert.deepEqual(nursingLiveSymptoms({ ...session, liveSymptomIds: ['invalid-id'] }, ['invalid-id']).map((symptom) => symptom.id), [variant.symptoms[0].id, variant.symptoms[2].id]);
 });
 
-test('Nursing transcript fallback excludes clear denials and only dismissal removes scoring credit', () => {
+test('Nursing transcript fallback excludes clear and reordered denials', () => {
   const mission = NURSING_CASES['nursing-1']; const variant = mission.blueprints[0];
-  const session = { mission, variant, usedTools: [], messages: [{ role: 'assistant', content: `Je n'ai pas de ${variant.symptoms[0].label}, mais ${variant.symptoms[1].label}.` }], liveSymptomIds: [variant.symptoms[2].id], symptomPins: [{ id: variant.symptoms[1].id, state: 'to-verify' }] };
+  const session = { mission, variant, usedTools: [], messages: [{ role: 'assistant', content: `Je n'ai pas de ${variant.symptoms[0].label}, mais ${variant.symptoms[1].label}.` }], liveSymptomIds: [variant.symptoms[2].id] };
   assert.deepEqual(nursingLiveSymptoms(session).map((symptom) => symptom.id), [variant.symptoms[1].id]);
-  const defaultCredit = evaluateNursingHypothesis(session, variant.diseaseId);
-  assert.equal(defaultCredit.evidence.foodHistory.count, 2);
-  session.symptomPins = [{ id: variant.symptoms[1].id, state: 'dismissed' }];
-  assert.equal(evaluateNursingHypothesis(session, variant.diseaseId).evidence.foodHistory.count, 1);
+  session.messages = [{ role: 'assistant', content: "Je n'ai pas eu de selles liquides depuis ce matin." }];
+  session.liveSymptomIds = [];
+  assert.deepEqual(nursingLiveSymptoms(session).map((symptom) => symptom.id), []);
+});
+
+test('Nursing transcript fallback recognizes an explicit sign even when its words are reordered', () => {
+  const variant = NURSING_CASES['nursing-1'].blueprints.find((candidate) => candidate.diseaseId === 'gastroenteritis');
+  const session = { mission: NURSING_CASES['nursing-1'], variant, messages: [{ role: 'assistant', content: 'Depuis ce matin, j’ai des selles plus liquides.' }] };
+  assert.deepEqual(nursingLiveSymptoms(session).map((symptom) => symptom.id), [variant.symptoms[0].id]);
+  session.messages = [{ role: 'assistant', content: 'Depuis ce matin, je n’ai pas de selles plus liquides.' }];
+  assert.deepEqual(nursingLiveSymptoms(session).map((symptom) => symptom.id), []);
+  session.messages = [{ role: 'assistant', content: 'J’ai des selles plus liquides, mais pas depuis ce matin.' }];
+  assert.deepEqual(nursingLiveSymptoms(session).map((symptom) => symptom.id), []);
+  session.messages = [{ role: 'assistant', content: 'Ma fatigue n’est pas inhabituelle.' }];
+  const viralVariant = NURSING_CASES['nursing-1'].blueprints.find((candidate) => candidate.diseaseId === 'viral-syndrome');
+  assert.deepEqual(nursingLiveSymptoms({ mission: NURSING_CASES['nursing-1'], variant: viralVariant, messages: session.messages }).map((symptom) => symptom.id), []);
 });
 
 test('high-alert Nursing simulations require an explicit fictional escalation before mastery', () => {
@@ -228,18 +238,35 @@ test('patient style and specialized tool presentation stay in the private and vi
 
 test('patient prompts require natural spoken French without consultation meta-commentary', () => {
   const nursingVariant = NURSING_CASES['nursing-1'].blueprints[0];
+  const nursingFemaleVariant = NURSING_CASES['nursing-1'].blueprints[2];
   const dieteticsVariant = CASES['dietetics-rhythm-overflow'].blueprints[0];
   const nursingPrompt = buildMissionPatientPrompt(nursingVariant, 'direct', [], []);
+  const nursingFemalePrompt = buildMissionPatientPrompt(nursingFemaleVariant, 'direct', [], []);
   const dieteticsPrompt = buildMissionPatientPrompt(dieteticsVariant, 'direct', [], []);
-  for (const prompt of [nursingPrompt, dieteticsPrompt]) {
+  for (const prompt of [nursingPrompt, nursingFemalePrompt, dieteticsPrompt]) {
     assert.match(prompt, /Tu parles comme une vraie personne/);
     assert.match(prompt, /N’utilise jamais le tiret long/);
+    assert.doesNotMatch(prompt, /·/);
   }
+  assert.match(nursingPrompt, /un patient lors d’une visite infirmière/);
+  assert.match(nursingFemalePrompt, /une patiente lors d’une visite infirmière/);
+  assert.match(dieteticsPrompt, /une patiente dans une conversation de diététique/);
   assert.match(nursingPrompt, /Ne commente jamais la mécanique de l’échange/);
   assert.match(nursingPrompt, /sans expliquer comment obtenir la suite des informations/);
   assert.match(nursingPrompt, new RegExp(nursingVariant.responseStyle));
   assert.match(dieteticsPrompt, /sans demander à la personne de poser la bonne question/);
   assert.match(dieteticsPrompt, new RegExp(dieteticsVariant.responseStyle));
+});
+
+test('every randomized patient trait remains compatible with both gendered prompt branches', () => {
+  const nursingVariant = NURSING_CASES['nursing-1'].blueprints[2];
+  const dieteticsVariant = CASES['dietetics-rhythm-overflow'].blueprints[0];
+  for (const trait of PATIENT_TRAITS) {
+    for (const prompt of [buildMissionPatientPrompt(nursingVariant, 'direct', [], [trait]), buildMissionPatientPrompt(dieteticsVariant, 'direct', [], [trait])]) {
+      assert.doesNotMatch(prompt, /·/);
+      assert.doesNotMatch(trait.instruction, /une pointe d’humour/i);
+    }
+  }
 });
 
 test('consultation modal is hidden until a support is opened', () => {
@@ -248,7 +275,15 @@ test('consultation modal is hidden until a support is opened', () => {
 });
 
 test('retired consultation language is absent from dietetics production code', () => {
-  const missionSource = fs.readFileSync(new URL('../server/missions.js', import.meta.url), 'utf8').split('const NURSING_NAMES')[0];
+  const missionSource = fs.readFileSync(new URL('../server/missions.js', import.meta.url), 'utf8').split('const NURSING_PATIENTS')[0];
   const sources = [missionSource, fs.readFileSync(new URL('../src/game/ai.js', import.meta.url), 'utf8'), fs.readFileSync(new URL('../src/game/engine.js', import.meta.url), 'utf8')].join('\n').toLowerCase();
   assert.doesNotMatch(sources, /screening|observation/);
+});
+
+test('Nursing UI keeps signs display-only and opens disease details in the consultation modal', () => {
+  const chatSource = fs.readFileSync(new URL('../src/ui/chat.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(chatSource, /Confirmé|À vérifier|Écarté|nursing-pin__states/);
+  assert.match(chatSource, /showDiseaseDetails/);
+  assert.match(chatSource, /nursing-disease-modal__symptom/);
+  assert.match(chatSource, /displaySymptom/);
 });

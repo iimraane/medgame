@@ -5,7 +5,9 @@ export async function renderChat(container, missionId) {
   const engine = new GameEngine(); let data;
   try { data = await engine.startMission(missionId); } catch (error) { container.innerHTML = `<div class="view debrief"><p>${error.message}</p><button class="btn btn--primary" id="back">Carte des missions</button></div>`; container.querySelector('#back').addEventListener('click', () => navigate('levels', { roleId: 'dietetics' })); return; }
   const { mission, patient } = data;
+  const displaySymptom = (label) => `${label.charAt(0).toLocaleUpperCase('fr-FR')}${label.slice(1)}`;
   container.innerHTML = `<div class="view chat career-chat"><div class="career-chat__debrief-loading" id="debrief-loading" role="status" aria-live="assertive" hidden><div><span class="career-chat__debrief-spinner" aria-hidden="true"></span><p>Préparation du débrief…</p><small>L’analyse de l’échange est en cours.</small></div></div><div class="consultation-modal" id="tool-modal" hidden><div class="consultation-modal__content" role="dialog" aria-modal="true" aria-label="Support de consultation"><button class="btn btn--small" id="close-tool">Fermer</button><div id="tool-content"></div></div></div><header class="chat__header"><button class="btn btn--small btn--secondary" id="exit">← Carte</button><div class="chat__patient-info"><div class="chat__patient-name">${patient.name.fullName}</div></div></header><main class="chat__body"><aside class="consultation-tools"><h2>Outils de consultation</h2><div id="tools"></div></aside><section class="chat__messages-area"><div class="chat__messages" id="messages"><div class="message message--patient"><div class="message__bubble"></div></div></div><div class="chat__input-area"><div class="career-chat__composer"><textarea class="chat__input" id="input" rows="2" placeholder="Message…"></textarea><button class="career-chat__voice" id="voice" type="button" aria-label="Dicter un message" title="Dicter un message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Z"></path><path d="M19 11a7 7 0 0 1-14 0M12 18v3M8 21h8"></path></svg></button></div><div class="career-chat__actions"><button class="btn btn--primary" id="send">Envoyer</button><button class="btn btn--secondary" id="finish">Terminer et débriefer</button></div></div></section></main></div>`;
+  let showDiseaseDetails = () => {};
   if (mission.roleId === 'nursing') {
     const chatBody = container.querySelector('.chat__body');
     const toolsRail = container.querySelector('.consultation-tools');
@@ -13,42 +15,31 @@ export async function renderChat(container, missionId) {
     toolsRail.innerHTML = `<h2>Documents</h2><div id="nursing-tools" class="nursing-tools"></div>`;
     const rail = document.createElement('aside');
     rail.className = 'nursing-rail nursing-rail--right';
-    rail.innerHTML = `<h2>Hypothèses</h2><div id="differential"></div><section class="nursing-card" id="disease-card" hidden></section><h2>Signes recueillis</h2><div id="symptoms" class="nursing-symptoms" role="status" aria-live="polite">Aucun signe n’a encore été formulé clairement par le patient.</div><button class="btn btn--primary nursing-submit" id="submit-hypothesis" disabled>Soumettre l’hypothèse</button>`;
+    rail.innerHTML = `<h2>Hypothèses</h2><div id="differential"></div><h2>Signes recueillis</h2><div id="symptoms" class="nursing-symptoms" role="status" aria-live="polite">Aucun signe n’a encore été formulé clairement par le patient.</div><button class="btn btn--primary nursing-submit" id="submit-hypothesis" disabled>Soumettre l’hypothèse</button>`;
     chatBody.classList.add('chat__body--nursing');
     chatBody.append(rail);
     let selectedDisease;
     const differential = rail.querySelector('#differential');
-    const card = rail.querySelector('#disease-card');
-    const symptoms = rail.querySelector('#symptoms'); let syncingPins = false;
-    const renderSymptoms = (found = [], pins = []) => {
-      const states = new Map(pins.map((pin) => [pin.id, pin.state]));
+    const symptoms = rail.querySelector('#symptoms');
+    const renderSymptoms = (found = []) => {
       symptoms.replaceChildren();
       if (!found.length) { symptoms.textContent = 'Aucun signe n’a encore été formulé clairement par le patient.'; return; }
       found.forEach((symptom) => {
         const item = document.createElement('article'); item.className = 'nursing-pin';
-        const title = document.createElement('strong'); title.textContent = symptom.label; item.append(title);
-        const controls = document.createElement('div'); controls.className = 'nursing-pin__states';
-        [['confirmed', 'Confirmé'], ['to-verify', 'À vérifier'], ['dismissed', 'Écarté']].forEach(([state, label]) => {
-          const button = document.createElement('button'); button.type = 'button'; button.textContent = label; button.className = states.get(symptom.id) === state ? 'is-active' : '';
-          button.addEventListener('click', async () => {
-            if (syncingPins) return; syncingPins = true;
-            const next = found.flatMap((entry) => entry.id === symptom.id ? [{ id: entry.id, state }] : states.has(entry.id) ? [{ id: entry.id, state: states.get(entry.id) }] : []);
-            try { const result = await engine.syncNursingPins(next); renderSymptoms(result.symptoms, result.pins); } catch (error) { engine.onError?.(error.message); } finally { syncingPins = false; }
-          }); controls.append(button);
-        }); item.append(controls); symptoms.append(item);
+        const title = document.createElement('strong'); title.textContent = displaySymptom(symptom.label); item.append(title); symptoms.append(item);
       });
     };
     const renderNursingTools = (tools) => { const toolsNode = toolsRail.querySelector('#nursing-tools'); toolsNode.innerHTML = tools.map((tool) => `<button class="btn btn--secondary consultation-tool" data-tool="${tool.id}">${tool.label}</button>`).join(''); toolsNode.querySelectorAll('[data-tool]').forEach((button) => button.addEventListener('click', () => engine.useTool(button.dataset.tool))); };
     differential.innerHTML = data.differential.map((disease) => `<button class="nursing-disease" data-disease="${disease.id}">${disease.name}</button>`).join('');
-    differential.querySelectorAll('[data-disease]').forEach((button) => { button.setAttribute('aria-expanded', 'false'); button.setAttribute('aria-controls', 'disease-card'); button.addEventListener('click', () => {
+    differential.querySelectorAll('[data-disease]').forEach((button) => { button.setAttribute('aria-haspopup', 'dialog'); button.addEventListener('click', () => {
       selectedDisease = button.dataset.disease; const disease = data.differential.find((item) => item.id === selectedDisease);
+      if (!disease) { selectedDisease = undefined; rail.querySelector('#submit-hypothesis').disabled = true; return; }
       differential.querySelectorAll('button').forEach((item) => item.classList.toggle('is-selected', item === button));
-      differential.querySelectorAll('button').forEach((item) => item.setAttribute('aria-expanded', String(item === button)));
-      card.hidden = false; card.innerHTML = `<h3></h3><p></p><ul></ul>`; card.querySelector('h3').textContent = disease.name; card.querySelector('p').textContent = disease.summary; disease.symptoms.forEach((sign) => { const item = document.createElement('li'); item.textContent = sign; card.querySelector('ul').append(item); });
+      showDiseaseDetails(disease, button);
       rail.querySelector('#submit-hypothesis').disabled = false;
     }); });
     if (data.tools?.length) { renderNursingTools(data.tools); engine.onTools = renderNursingTools; } else { toolsRail.remove(); chatBody.classList.add('chat__body--nursing-no-documents'); }
-    engine.onNursingSymptoms = renderSymptoms;
+    engine.onNursingSymptoms = (found) => renderSymptoms(found);
     rail.querySelector('#submit-hypothesis').addEventListener('click', () => engine.submitNursingHypothesis(selectedDisease));
     container.querySelector('#finish').hidden = true;
   }
@@ -61,7 +52,26 @@ export async function renderChat(container, missionId) {
     }
   };
   renderText(messages.querySelector('.message__bubble'), patient.opening, true);
-  const modal = container.querySelector('#tool-modal'); const toolContent = container.querySelector('#tool-content');
+  const modal = container.querySelector('#tool-modal'); const modalDialog = modal.querySelector('[role="dialog"]'); const closeTool = container.querySelector('#close-tool'); const toolContent = container.querySelector('#tool-content'); let modalOpener;
+  const openModal = (label, opener) => { modalDialog.setAttribute('aria-label', label); modalOpener = opener; modal.hidden = false; closeTool.focus(); };
+  const closeModal = () => { modal.hidden = true; modalOpener?.focus(); modalOpener = undefined; };
+  modal.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') { event.preventDefault(); closeModal(); return; }
+    if (event.key !== 'Tab') return;
+    const focusable = [...modalDialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((item) => !item.disabled);
+    if (!focusable.length) return;
+    const first = focusable[0]; const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
+  showDiseaseDetails = (disease, opener) => {
+    toolContent.replaceChildren();
+    const title = document.createElement('h2'); title.textContent = disease.name; toolContent.append(title);
+    const description = document.createElement('p'); description.className = 'nursing-disease-modal__summary'; description.textContent = disease.summary; toolContent.append(description);
+    const cards = document.createElement('section'); cards.className = 'nursing-disease-modal__symptoms';
+    disease.symptoms.forEach((sign, index) => { const item = document.createElement('article'); item.className = 'nursing-disease-modal__symptom'; item.innerHTML = `<span>Symptôme ${index + 1}</span><p></p>`; item.querySelector('p').textContent = displaySymptom(sign); cards.append(item); });
+    toolContent.append(cards); openModal(`Détails de l’hypothèse : ${disease.name}`, opener);
+  };
   const showTool = (tool) => {
     toolContent.replaceChildren(); const title = document.createElement('h2'); title.textContent = tool.label; toolContent.append(title);
     if (tool.evidence.images) {
@@ -86,10 +96,10 @@ export async function renderChat(container, missionId) {
     } else {
       const panel = document.createElement('div'); panel.className = `consultation-evidence consultation-evidence--${tool.kind}`; tool.evidence.notes.forEach((note, index) => { const item = document.createElement('div'); item.className = 'consultation-evidence__item'; item.innerHTML = `<span>${tool.kind === 'journal' ? ['Matin', 'Après-midi'][index] : ['Réserve', 'Réfrigérateur'][index]}</span><p></p>`; item.querySelector('p').textContent = note; panel.append(item); }); toolContent.append(panel);
     }
-    modal.hidden = false;
+    openModal(`Support de consultation : ${tool.label}`);
   };
   const renderTools = (tools) => { const rail = container.querySelector('#tools'); rail.innerHTML = tools.length ? tools.map((tool) => `<button class="btn btn--secondary consultation-tool" data-tool="${tool.id}">${tool.label}</button>`).join('') : '<p class="consultation-tool__empty">Tous les outils disponibles ont été consultés.</p>'; rail.querySelectorAll('[data-tool]').forEach((button) => button.addEventListener('click', () => engine.useTool(button.dataset.tool))); };
-  if (mission.roleId !== 'nursing') { renderTools(data.tools || []); engine.onTools = renderTools; } container.querySelector('#close-tool').addEventListener('click', () => { modal.hidden = true; });
+  if (mission.roleId !== 'nursing') { renderTools(data.tools || []); engine.onTools = renderTools; } closeTool.addEventListener('click', closeModal);
   container.querySelector('#exit').addEventListener('click', () => navigate('levels', { roleId: mission.roleId }));
   const add = (message) => { if (message.role === 'tool') { showTool(message); return; } const item = document.createElement('div'); item.className = `message message--${message.role === 'doctor' ? 'doctor' : 'patient'}`; item.innerHTML = `<div class="message__bubble"></div>`; renderText(item.querySelector('.message__bubble'), message.content, message.role === 'patient'); messages.appendChild(item); messages.scrollTop = messages.scrollHeight; };
   engine.onMessage = add; engine.onError = (message) => alert(message); engine.onGuardrailFail = (message) => alert(message); engine.onTyping = () => {}; engine.onEvaluating = (active) => { container.querySelector('#debrief-loading').hidden = !active; };

@@ -1,7 +1,3 @@
-- source_spec: `/Users/imrane/Desktop/Code/medgame/_bmad-output/implementation-artifacts/spec-randomized-dietetics-consultation-tools.md`
-  summary: The independent verification-gap review could not run because the workspace had no remaining credits.
-  evidence: The layer reported a workspace-credit error; `npm test`, the production build, and the whitespace check were run locally after review fixes.
-
-- source_spec: none
-  summary: Make the admin mode unlock every Nursing mission as well as Dietetics.
-  evidence: This changes campaign progression independently of the Nursing consultation experience, so the user chose to split it.
+- source_spec: `/Users/imrane/Desktop/Code/medgame/_bmad-output/implementation-artifacts/spec-nursing-consultation-clarity.md`
+  summary: Add a DOM-level automated Nursing consultation test once the project adopts a browser or DOM test runtime.
+  evidence: The primary rail and shared-modal interaction is currently covered by manual local-browser verification and source contracts, but the Node test suite has no DOM runtime to execute the interaction automatically.

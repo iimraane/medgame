@@ -1,6 +1,6 @@
 import { getMission, getMissionsForRole } from '../data/missions.js';
 import { getRole } from '../data/roles.js';
-import { startSession, sendMessage, evaluateMission, useConsultationTool, recordSecureNextStep, syncNursingSymptoms, submitNursingHypothesis } from './ai.js';
+import { startSession, sendMessage, evaluateMission, useConsultationTool, recordSecureNextStep, submitNursingHypothesis } from './ai.js';
 import { loadSave, recordMissionResult, isMissionUnlocked, getRecentVariantIds, recordVariantId } from '../utils/storage.js';
 import { offlineFallbackFeedback } from './evaluation.js';
 
@@ -30,7 +30,6 @@ class GameEngine {
   recordAction(action) { if (!this.actions.includes(action)) this.actions.push(action); }
   async useTool(toolId) { if (this.isWaiting || this.isFinished) return; this.isWaiting = true; try { const data = await useConsultationTool(this.sessionId, toolId); this.tools = data.tools || []; if (data.tool) this.onMessage?.({ role: 'tool', ...data.tool }); this.onTools?.(this.tools); } catch (error) { this.onError?.(error.message); } finally { this.isWaiting = false; } }
   async recordSecureAction() { try { const result = await recordSecureNextStep(this.sessionId); if (result.recorded) { this.actions.push('secure-next-step'); return true; } return false; } catch (error) { this.onError?.(error.message); return false; } }
-  async syncNursingPins(pins) { const result = await syncNursingSymptoms(this.sessionId, pins); this.symptomPins = result.pins; return result; }
   async submitNursingHypothesis(diseaseId) {
     if (this.isFinished || this.isWaiting || !diseaseId) return;
     this.isWaiting = true; this.onEvaluating?.(true);

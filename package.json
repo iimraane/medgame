@@ -5,10 +5,10 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "vite build",
+        "build": "vite build && node scripts/verify-dist.mjs",
         "test": "node --test tests/*.test.js",
         "preview": "vite preview",
-        "server": "node server/server.js",
+        "server": "npm run build && node server/server.js",
         "start": "concurrently \"npm run server\" \"npm run dev\""
     },
     "dependencies": {

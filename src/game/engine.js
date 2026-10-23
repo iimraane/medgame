@@ -5,7 +5,7 @@ import { loadSave, recordMissionResult, isMissionUnlocked, getRecentVariantIds, 
 import { offlineFallbackFeedback } from './evaluation.js';
 
 class GameEngine {
-  constructor() { this.sessionId = null; this.mission = null; this.patient = null; this.tools = []; this.differential = []; this.symptomPins = []; this.requiresSecureNextStep = false; this.messages = []; this.actions = []; this.isWaiting = false; this.isFinished = false; this.onMessage = null; this.onTyping = null; this.onError = null; this.onGuardrailFail = null; this.onFinish = null; this.onEvaluating = null; this.onTools = null; }
+  constructor() { this.sessionId = null; this.mission = null; this.patient = null; this.tools = []; this.differential = []; this.symptomPins = []; this.requiresSecureNextStep = false; this.messages = []; this.actions = []; this.isWaiting = false; this.isFinished = false; this.onMessage = null; this.onTyping = null; this.onError = null; this.onGuardrailFail = null; this.onFinish = null; this.onEvaluating = null; this.onTools = null; this.onNursingSymptoms = null; }
   async startMission(missionId) {
     const mission = getMission(missionId); if (!mission) throw new Error('Mission introuvable.');
     const save = loadSave(); const missions = getMissionsForRole(mission.roleId);
@@ -16,7 +16,7 @@ class GameEngine {
   }
   async sendDoctorMessage(text) {
     if (this.isWaiting || this.isFinished || !text.trim()) return; this.isWaiting = true;
-    try { this.messages.push({ role: 'doctor', content: text.trim() }); this.onMessage?.(this.messages.at(-1)); this.onTyping?.(true); const response = await sendMessage(this.sessionId, text.trim()); this.onTyping?.(false); if (response.guardrailFailed) { this.messages.pop(); this.onGuardrailFail?.(response.reason || 'Message unavailable.'); return; } this.messages.push({ role: 'patient', content: response.message }); this.onMessage?.(this.messages.at(-1)); }
+    try { this.messages.push({ role: 'doctor', content: text.trim() }); this.onMessage?.(this.messages.at(-1)); this.onTyping?.(true); const response = await sendMessage(this.sessionId, text.trim()); this.onTyping?.(false); if (response.guardrailFailed) { this.messages.pop(); this.onGuardrailFail?.(response.reason || 'Message unavailable.'); return; } this.messages.push({ role: 'patient', content: response.message }); this.onMessage?.(this.messages.at(-1)); if (response.nursing) { this.symptomPins = response.nursing.pins || []; this.onNursingSymptoms?.(response.nursing.symptoms || [], this.symptomPins); } }
     catch (error) { this.onTyping?.(false); this.onError?.(error.message); } finally { this.isWaiting = false; }
   }
   async finishMission() {

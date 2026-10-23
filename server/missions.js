@@ -142,18 +142,29 @@ export function isNursingMission(mission) { return mission?.roleId === 'nursing'
 export function chooseNursingCase(mission, recentVariantIds = [], random = Math.random) { return chooseVariant(mission, recentVariantIds, random); }
 export function getNursingTools(mission) { return NURSING_DOCUMENT_DEFINITIONS.filter(([, order]) => mission.order >= order).map(([id, , label]) => ({ id, label, kind: 'nursing-document' })); }
 export function useNursingTool(variant, toolId, used = []) { const evidence = variant?.evidence?.[toolId]; if (!evidence) return null; return { id: toolId, label: evidence.title, kind: 'nursing-document', alreadyConsulted: used.includes(toolId), evidence, promptNotes: evidence.facts }; }
-export function transcriptConfirmedSymptoms(session) { const transcript = session.messages.filter((message) => message.role === 'assistant').map((message) => message.content.toLowerCase()).join('\n'); return session.variant.symptoms.filter((symptom) => transcript.includes(symptom.label.toLowerCase())); }
+export function transcriptConfirmedSymptoms(session) { const transcript = session.messages.filter((message) => message.role === 'assistant').map((message) => String(message.content || '').toLowerCase()).join('\n'); return session.variant.symptoms.filter((symptom) => transcript.includes(symptom.label.toLowerCase())); }
+export function normalizeExtractedNursingSymptoms(session, extractedIds = []) {
+  if (!Array.isArray(extractedIds)) return [];
+  const allowed = new Set(session.variant.symptoms.map((symptom) => symptom.id));
+  return [...new Set(extractedIds)].filter((id) => typeof id === 'string' && allowed.has(id));
+}
+export function nursingLiveSymptoms(session, extractedIds = []) {
+  const extracted = new Set(normalizeExtractedNursingSymptoms(session, extractedIds));
+  return session.variant.symptoms.filter((symptom) => extracted.has(symptom.id) || transcriptConfirmedSymptoms(session).some((confirmed) => confirmed.id === symptom.id));
+}
 export function sanitizeNursingPins(session, requestedPins = []) {
-  const confirmedIds = new Set(transcriptConfirmedSymptoms(session).map((symptom) => symptom.id));
+  const confirmedIds = new Set(nursingLiveSymptoms(session, session.liveSymptomIds).map((symptom) => symptom.id));
   const allowedStates = new Set(['confirmed', 'to-verify', 'dismissed']);
-  return requestedPins
+  const pins = new Map();
+  requestedPins
     .filter((pin) => pin && typeof pin === 'object' && confirmedIds.has(pin.id) && allowedStates.has(pin.state))
-    .map((pin) => ({ id: pin.id, state: pin.state }));
+    .forEach((pin) => pins.set(pin.id, { id: pin.id, state: pin.state }));
+  return [...pins.values()];
 }
 export function evaluateNursingHypothesis(session, diseaseId) {
   const disease = NURSING_DISEASES[diseaseId];
   if (!disease || !session.mission.diseases.some((item) => item.id === diseaseId)) return { error: 'Hypothèse inconnue pour cette mission.' };
-  const confirmed = transcriptConfirmedSymptoms(session);
+  const confirmed = nursingLiveSymptoms(session, session.liveSymptomIds);
   const creditedPins = (session.symptomPins || []).filter((pin) => pin.state !== 'dismissed');
   const exploredSymptoms = creditedPins.length ? confirmed.filter((symptom) => creditedPins.some((pin) => pin.id === symptom.id)) : confirmed;
   const userMessages = session.messages.filter((message) => message.role === 'user').length;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 
 process.env.NODE_ENV = 'test';
-const { app, sessions } = await import('../server/server.js');
+const { app, sessions, setTestOpenAIClient } = await import('../server/server.js');
 const { NURSING_DOSSIERS } = await import('../server/nursingDossiers.js');
 const { NURSING_DOCUMENT_DEFINITIONS } = await import('../server/nursingDossiers.js');
 const { buildNursingEvaluationPrompt } = await import('../server/missionEvaluation.js');
@@ -18,7 +18,7 @@ async function withServer(run) {
       let raw = ''; response.on('data', (chunk) => { raw += chunk; }); response.on('end', () => resolve({ status: response.statusCode, body: JSON.parse(raw) }));
     }); request.on('error', reject); request.end(payload);
   });
-  try { await run(post); } finally { sessions.clear(); await new Promise((resolve) => server.close(resolve)); }
+  try { await run(post); } finally { sessions.clear(); setTestOpenAIClient(null); await new Promise((resolve) => server.close(resolve)); }
 }
 
 test('Nursing HTTP flow returns level-gated, case-authorized reusable evidence and server-authorized pins', async () => {
@@ -40,11 +40,40 @@ test('Nursing HTTP flow returns level-gated, case-authorized reusable evidence a
     assert.equal(invalid.body.tool, null);
     assert.equal(session.usedTools.length, beforeInvalid);
     const pins = await post('/game/api/nursing-symptoms', { sessionId: start.body.sessionId, pins: [{ id: symptom.id, state: 'confirmed' }, { id: 'forged', state: 'confirmed' }] });
+    assert.deepEqual(pins.body.symptoms, [symptom]);
     assert.deepEqual(pins.body.pins, [{ id: symptom.id, state: 'confirmed' }]);
     const result = await post('/game/api/nursing-hypothesis', { sessionId: start.body.sessionId, diseaseId: session.variant.diseaseId });
     assert.equal(result.status, 200); assert.equal(result.body.correct, true);
     const expired = await post('/game/api/nursing-hypothesis', { sessionId: start.body.sessionId, diseaseId: session.variant.diseaseId });
     assert.equal(expired.status, 400);
+  });
+});
+
+test('Nursing chat returns cumulative authorized live signs and falls back when extraction is invalid', async () => {
+  await withServer(async (post) => {
+    const start = await post('/game/api/start', { missionId: 'nursing-1', roleId: 'nursing' });
+    const session = sessions.get(start.body.sessionId); const [first, second] = session.variant.symptoms;
+    let completion = 0;
+    setTestOpenAIClient({ chat: { completions: { create: async () => {
+      completion++;
+      if (completion === 1) return { choices: [{ message: { content: '{"valid":true}' } }] };
+      if (completion === 2) return { choices: [{ message: { content: first.label } }] };
+      return { choices: [{ message: { content: JSON.stringify({ symptomIds: [second.id, 'foreign-id'] }) } }] };
+    } } } });
+    const firstTurn = await post('/game/api/chat', { sessionId: start.body.sessionId, message: 'Pouvez-vous préciser ?' });
+    assert.deepEqual(firstTurn.body.nursing.symptoms.map((symptom) => symptom.id), [first.id, second.id]);
+    const pinned = await post('/game/api/nursing-symptoms', { sessionId: start.body.sessionId, pins: [{ id: first.id, state: 'to-verify' }] });
+    assert.deepEqual(pinned.body.pins, [{ id: first.id, state: 'to-verify' }]);
+    completion = 0;
+    setTestOpenAIClient({ chat: { completions: { create: async () => {
+      completion++;
+      if (completion === 1) return { choices: [{ message: { content: '{"valid":true}' } }] };
+      if (completion === 2) return { choices: [{ message: { content: first.label } }] };
+      throw new Error('extractor unavailable');
+    } } } });
+    const secondTurn = await post('/game/api/chat', { sessionId: start.body.sessionId, message: 'Et maintenant ?' });
+    assert.deepEqual(secondTurn.body.nursing.symptoms.map((symptom) => symptom.id), [first.id, second.id]);
+    assert.deepEqual(secondTurn.body.nursing.pins, [{ id: first.id, state: 'to-verify' }]);
   });
 });
 

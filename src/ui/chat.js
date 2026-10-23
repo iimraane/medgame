@@ -13,13 +13,13 @@ export async function renderChat(container, missionId) {
     toolsRail.innerHTML = `<h2>Documents</h2><div id="nursing-tools" class="nursing-tools"></div>`;
     const rail = document.createElement('aside');
     rail.className = 'nursing-rail nursing-rail--right';
-    rail.innerHTML = `<h2>Hypothèses</h2><div id="differential"></div><section class="nursing-card" id="disease-card" hidden></section><h2>Signes recueillis</h2><div id="symptoms" class="nursing-symptoms">Interrogez le patient, puis actualisez.</div><button class="btn btn--secondary nursing-action" id="refresh-symptoms">Actualiser les signes</button><button class="btn btn--primary nursing-submit" id="submit-hypothesis" disabled>Soumettre l’hypothèse</button>`;
+    rail.innerHTML = `<h2>Hypothèses</h2><div id="differential"></div><section class="nursing-card" id="disease-card" hidden></section><h2>Signes recueillis</h2><div id="symptoms" class="nursing-symptoms">Aucun signe n’a encore été formulé clairement par le patient.</div><button class="btn btn--primary nursing-submit" id="submit-hypothesis" disabled>Soumettre l’hypothèse</button>`;
     chatBody.classList.add('chat__body--nursing');
     chatBody.append(rail);
     let selectedDisease;
     const differential = rail.querySelector('#differential');
     const card = rail.querySelector('#disease-card');
-    const symptoms = rail.querySelector('#symptoms');
+    const symptoms = rail.querySelector('#symptoms'); let syncingPins = false;
     const renderSymptoms = (found = [], pins = []) => {
       const states = new Map(pins.map((pin) => [pin.id, pin.state]));
       symptoms.replaceChildren();
@@ -31,22 +31,24 @@ export async function renderChat(container, missionId) {
         [['confirmed', 'Confirmé'], ['to-verify', 'À vérifier'], ['dismissed', 'Écarté']].forEach(([state, label]) => {
           const button = document.createElement('button'); button.type = 'button'; button.textContent = label; button.className = states.get(symptom.id) === state ? 'is-active' : '';
           button.addEventListener('click', async () => {
-            const next = found.map((entry) => ({ id: entry.id, state: entry.id === symptom.id ? state : states.get(entry.id) || 'confirmed' }));
-            try { const result = await engine.syncNursingPins(next); renderSymptoms(result.symptoms, result.pins); } catch (error) { engine.onError?.(error.message); }
+            if (syncingPins) return; syncingPins = true;
+            const next = found.flatMap((entry) => entry.id === symptom.id ? [{ id: entry.id, state }] : states.has(entry.id) ? [{ id: entry.id, state: states.get(entry.id) }] : []);
+            try { const result = await engine.syncNursingPins(next); renderSymptoms(result.symptoms, result.pins); } catch (error) { engine.onError?.(error.message); } finally { syncingPins = false; }
           }); controls.append(button);
         }); item.append(controls); symptoms.append(item);
       });
     };
-    const renderNursingTools = (tools) => { const toolsNode = toolsRail.querySelector('#nursing-tools'); toolsNode.innerHTML = tools.length ? tools.map((tool) => `<button class="btn btn--secondary consultation-tool" data-tool="${tool.id}">${tool.label}</button>`).join('') : '<p class="consultation-tool__empty">Aucun document n’est débloqué pour cette mission.</p>'; toolsNode.querySelectorAll('[data-tool]').forEach((button) => button.addEventListener('click', () => engine.useTool(button.dataset.tool))); };
+    const renderNursingTools = (tools) => { const toolsNode = toolsRail.querySelector('#nursing-tools'); toolsNode.innerHTML = tools.map((tool) => `<button class="btn btn--secondary consultation-tool" data-tool="${tool.id}">${tool.label}</button>`).join(''); toolsNode.querySelectorAll('[data-tool]').forEach((button) => button.addEventListener('click', () => engine.useTool(button.dataset.tool))); };
     differential.innerHTML = data.differential.map((disease) => `<button class="nursing-disease" data-disease="${disease.id}">${disease.name}</button>`).join('');
-    differential.querySelectorAll('[data-disease]').forEach((button) => button.addEventListener('click', () => {
+    differential.querySelectorAll('[data-disease]').forEach((button) => { button.setAttribute('aria-expanded', 'false'); button.addEventListener('click', () => {
       selectedDisease = button.dataset.disease; const disease = data.differential.find((item) => item.id === selectedDisease);
       differential.querySelectorAll('button').forEach((item) => item.classList.toggle('is-selected', item === button));
-      card.hidden = false; card.innerHTML = `<h3></h3><p></p>`; card.querySelector('h3').textContent = disease.name; card.querySelector('p').textContent = disease.summary;
+      differential.querySelectorAll('button').forEach((item) => item.setAttribute('aria-expanded', String(item === button)));
+      card.hidden = false; card.innerHTML = `<h3></h3><p></p><ul></ul>`; card.querySelector('h3').textContent = disease.name; card.querySelector('p').textContent = disease.summary; disease.symptoms.forEach((sign) => { const item = document.createElement('li'); item.textContent = sign; card.querySelector('ul').append(item); });
       rail.querySelector('#submit-hypothesis').disabled = false;
-    }));
-    renderNursingTools(data.tools || []); engine.onTools = renderNursingTools;
-    rail.querySelector('#refresh-symptoms').addEventListener('click', async () => { try { const result = await engine.syncNursingPins(engine.symptomPins); renderSymptoms(result.symptoms, result.pins); } catch (error) { engine.onError?.(error.message); } });
+    }); });
+    if (data.tools?.length) { renderNursingTools(data.tools); engine.onTools = renderNursingTools; } else { toolsRail.remove(); chatBody.classList.add('chat__body--nursing-no-documents'); }
+    engine.onNursingSymptoms = renderSymptoms;
     rail.querySelector('#submit-hypothesis').addEventListener('click', () => engine.submitNursingHypothesis(selectedDisease));
     container.querySelector('#finish').hidden = true;
   }

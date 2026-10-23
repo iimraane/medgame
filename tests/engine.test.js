@@ -19,3 +19,18 @@ test('evaluation failure uses a non-mastering offline fallback', async () => {
 test('finish is ignored while a message is pending', async () => {
   const engine = new GameEngine(); engine.isWaiting = true; await engine.finishMission(); assert.equal(engine.isFinished, false);
 });
+test('Nursing chat payload updates the live-sign callback without a follow-up request', async () => {
+  const symptoms = [{ id: 'sign-1', label: 'Signe autorisé' }]; let requests = 0;
+  globalThis.fetch = async (_url, options) => {
+    requests++;
+    const body = JSON.parse(options.body);
+    if (body.missionId) return { json: async () => ({ ...startResponse(), differential: [], tools: [] }) };
+    return { json: async () => ({ message: 'Réponse fictive.', nursing: { symptoms, pins: [{ id: 'sign-1', state: 'confirmed' }] } }) };
+  };
+  const engine = new GameEngine(); await engine.startMission('nursing-1'); let received;
+  engine.onNursingSymptoms = (found, pins) => { received = { found, pins }; };
+  await engine.sendDoctorMessage('Pouvez-vous préciser ?');
+  assert.equal(requests, 2);
+  assert.deepEqual(received, { found: symptoms, pins: [{ id: 'sign-1', state: 'confirmed' }] });
+  assert.deepEqual(engine.symptomPins, [{ id: 'sign-1', state: 'confirmed' }]);
+});

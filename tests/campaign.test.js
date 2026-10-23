@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { MISSIONS } from '../src/data/missions.js';
-import { CASES, NURSING_CASES, MASTERY_THRESHOLD, chooseVariant, getEligibleTools, useConsultationTool, getNursingTools, useNursingTool, sanitizeNursingPins, evaluateNursingHypothesis, evaluateServerMission } from '../server/missions.js';
+import { CASES, NURSING_CASES, MASTERY_THRESHOLD, chooseVariant, getEligibleTools, useConsultationTool, getNursingTools, useNursingTool, nursingLiveSymptoms, sanitizeNursingPins, evaluateNursingHypothesis, evaluateServerMission } from '../server/missions.js';
 import { NURSING_POOL_SIZES } from '../src/data/nursingCampaign.js';
 import { NURSING_DISEASES } from '../src/data/nursingCampaign.js';
 import { NURSING_DOSSIERS, NURSING_DOCUMENT_DEFINITIONS } from '../server/nursingDossiers.js';
@@ -82,6 +82,20 @@ test('Nursing pins only retain symptoms actually stated by the patient and hypot
   const rushed = evaluateNursingHypothesis({ ...session, usedTools: [], messages: [{ role: 'assistant', content: variant.symptoms[0].label }] }, variant.diseaseId);
   assert.equal(rushed.mastery, false);
   assert.equal(evaluateNursingHypothesis(session, 'forged').error, 'Hypothèse inconnue pour cette mission.');
+});
+
+test('Nursing live signs are cumulative, case-authorized, and preserve valid pins', () => {
+  const mission = NURSING_CASES['nursing-1'];
+  const variant = mission.blueprints[0];
+  const foreign = mission.blueprints.find((candidate) => candidate.diseaseId !== variant.diseaseId).symptoms[0];
+  const session = { mission, variant, messages: [{ role: 'assistant', content: variant.symptoms[0].label }], liveSymptomIds: [variant.symptoms[1].id, foreign.id] };
+  assert.deepEqual(nursingLiveSymptoms(session, session.liveSymptomIds).map((symptom) => symptom.id), [variant.symptoms[0].id, variant.symptoms[1].id]);
+  session.symptomPins = sanitizeNursingPins(session, [{ id: variant.symptoms[0].id, state: 'confirmed' }]);
+  session.messages.push({ role: 'assistant', content: variant.symptoms[2].label });
+  session.liveSymptomIds.push(variant.symptoms[2].id);
+  assert.deepEqual(nursingLiveSymptoms(session, session.liveSymptomIds).map((symptom) => symptom.id), variant.symptoms.map((symptom) => symptom.id));
+  assert.deepEqual(sanitizeNursingPins(session, session.symptomPins), [{ id: variant.symptoms[0].id, state: 'confirmed' }]);
+  assert.deepEqual(nursingLiveSymptoms({ ...session, liveSymptomIds: ['invalid-id'] }, ['invalid-id']).map((symptom) => symptom.id), [variant.symptoms[0].id, variant.symptoms[2].id]);
 });
 
 test('high-alert Nursing simulations require an explicit fictional escalation before mastery', () => {
@@ -194,6 +208,10 @@ test('patient style and specialized tool presentation stay in the private and vi
   assert.match(chatSource, /chatBody\.classList\.add\('chat__body--nursing'\)/);
   assert.match(chatSource, /chatBody\.append\(rail\)/);
   assert.match(styleSource, /\.career-chat \.chat__body--nursing \{ grid-template-columns: minmax\(220px, 250px\) minmax\(0, 1fr\) minmax\(270px, 320px\); \}/);
+  assert.match(chatSource, /toolsRail\.remove\(\)/);
+  assert.match(chatSource, /disease\.symptoms\.forEach/);
+  assert.doesNotMatch(chatSource, /refresh-symptoms/);
+  assert.match(styleSource, /chat__body--nursing-no-documents/);
   assert.doesNotMatch(chatSource, /Prévoir une prochaine étape sûre/);
 });
 

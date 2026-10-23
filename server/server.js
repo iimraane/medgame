@@ -18,7 +18,7 @@ const { LEVELS, getLevel } = await import(pathToFileURL(join(dataDir, 'levels.js
 const { CARDS, getCardsForLevel } = await import(pathToFileURL(join(dataDir, 'cards.js')).href);
 const { MODIFIERS, pickRandomModifiers } = await import(pathToFileURL(join(dataDir, 'modifiers.js')).href);
 const { getRole } = await import(pathToFileURL(join(dataDir, 'roles.js')).href);
-const { MASTERY_THRESHOLD, getServerMission, evaluateServerMission, chooseArchetype, chooseVariant, getPresentation, getEligibleTools, useConsultationTool, isNursingMission, getNursingTools, useNursingTool, transcriptConfirmedSymptoms, sanitizeNursingPins, evaluateNursingHypothesis } = await import(pathToFileURL(join(__dirname, 'missions.js')).href);
+const { MASTERY_THRESHOLD, getServerMission, evaluateServerMission, chooseArchetype, chooseVariant, getPresentation, getEligibleTools, useConsultationTool, isNursingMission, getNursingTools, useNursingTool, transcriptConfirmedSymptoms, nursingLiveSymptoms, sanitizeNursingPins, evaluateNursingHypothesis } = await import(pathToFileURL(join(__dirname, 'missions.js')).href);
 const { getOpenAIModel, buildMissionPatientPrompt } = await import(pathToFileURL(join(__dirname, 'missionPatient.js')).href);
 const { choosePatientTraits, chooseNonVerbalCue } = await import(pathToFileURL(join(__dirname, 'patientTraits.js')).href);
 const { MISSION_EVALUATION_SCHEMA, buildMissionEvaluationPrompt, buildNursingEvaluationPrompt, normalizeMissionEvaluation } = await import(pathToFileURL(join(__dirname, 'missionEvaluation.js')).href);
@@ -86,7 +86,10 @@ const sessionCleanup = setInterval(() => {
 sessionCleanup.unref();
 
 // ─── OpenAI Client ───────────────────────────────────────────────
+let testClient = null;
+export function setTestOpenAIClient(client) { testClient = client; }
 function getClient() {
+    if (process.env.NODE_ENV === 'test' && testClient) return testClient;
     const key = process.env.OPENAI_API_KEY;
     if (!key || key === 'sk-your-key-here') return null;
     return new OpenAI({ apiKey: key });
@@ -182,6 +185,34 @@ Sois TRÈS tolérant. En cas de doute, accepte.
 
 Réponds UNIQUEMENT en JSON : {"valid": true} ou {"valid": false, "reason": "explication très courte"}`;
 
+async function extractNursingSymptomIds(client, session, patientReply) {
+    if (!client || !isNursingMission(session.mission)) return [];
+    const authorized = session.variant.symptoms.map(({ id, label }) => ({ id, label }));
+    try {
+        const extraction = await client.chat.completions.create({
+            model: getOpenAIModel(),
+            messages: [{
+                role: 'system',
+                content: `Dans cette simulation fictive, identifie uniquement les signes explicitement formulés dans la dernière réponse du patient. Tu peux choisir seulement parmi ces signes autorisés : ${JSON.stringify(authorized)}. N'infère rien, n'ajoute aucun identifiant et ne révèle aucune maladie.`
+            }, { role: 'user', content: patientReply }],
+            response_format: { type: 'json_object' },
+            max_completion_tokens: 100,
+        });
+        const parsed = JSON.parse(extraction.choices[0].message.content || '{}');
+        return Array.isArray(parsed.symptomIds) ? parsed.symptomIds : [];
+    } catch (err) {
+        console.error('Nursing symptom extraction fallback:', err.message);
+        return [];
+    }
+}
+
+function extractionWithTimeout(client, session, patientReply) {
+    return Promise.race([
+        extractNursingSymptomIds(client, session, patientReply),
+        new Promise((resolve) => setTimeout(() => resolve([]), 3000)),
+    ]);
+}
+
 // ─── Evaluation Feedback Builder ────────────────────────────────
 function buildFeedbackPrompt(expectedCondition) {
     return `Tu es un évaluateur médical. Le patient avait la maladie suivante : ${expectedCondition}.
@@ -240,7 +271,7 @@ app.post('/game/api/start', async (req, res) => {
             const presentation = nursing ? { opening: variant.opening } : getPresentation(variant, archetype);
             const opening = `${presentation.opening} ${chooseNonVerbalCue(patientTraits)}`;
             sessions.set(sessionId, { createdAt: Date.now(), missionId, roleId, mission, variant, archetype, patientTraits, usedTools: [], actions: [], interactionEvents: [], prompt: buildMissionPatientPrompt(variant, archetype, [], patientTraits), messages: [{ role: 'assistant', content: opening }] });
-            return res.json({ sessionId, variantId: variant.id, patient: { name: { firstName: variant.patient.name, fullName: variant.patient.name, age: variant.patient.age, gender: 'Personne fictive' }, opening, modifiers: [], antecedentsHtml: nursing ? 'Simulation éducative fictive — aucune donnée médicale réelle.' : 'Profil de consultation chargé.' }, tools: nursing ? getNursingTools(mission) : getEligibleTools(mission), differential: nursing ? mission.diseases.map(({ id, name, summary }) => ({ id, name, summary })) : [] });
+            return res.json({ sessionId, variantId: variant.id, patient: { name: { firstName: variant.patient.name, fullName: variant.patient.name, age: variant.patient.age, gender: 'Personne fictive' }, opening, modifiers: [], antecedentsHtml: nursing ? 'Simulation éducative fictive — aucune donnée médicale réelle.' : 'Profil de consultation chargé.' }, tools: nursing ? getNursingTools(mission) : getEligibleTools(mission), differential: nursing ? mission.diseases.map(({ id, name, summary, symptoms }) => ({ id, name, summary, symptoms })) : [] });
         }
         const level = getLevel(levelId);
         if (!level) return res.status(400).json({ error: 'Niveau invalide' });
@@ -343,7 +374,7 @@ app.post('/game/api/consultation-tool', (req, res) => {
 app.post('/game/api/nursing-symptoms', (req, res) => {
     const session = sessions.get(req.body.sessionId);
     if (!session?.mission || !isNursingMission(session.mission)) return res.status(400).json({ error: 'Session Nursing invalide.' });
-    const confirmed = transcriptConfirmedSymptoms(session);
+    const confirmed = nursingLiveSymptoms(session, session.liveSymptomIds);
     const requested = Array.isArray(req.body.pins) ? req.body.pins : [];
     const pins = sanitizeNursingPins(session, requested);
     session.symptomPins = pins;
@@ -426,10 +457,19 @@ app.post('/game/api/chat', async (req, res) => {
         });
 
         const response = completion.choices[0].message.content;
+        if (typeof response !== 'string') throw new Error('Réponse patient invalide.');
         session.messages.push({ role: 'assistant', content: response });
         if (session.mission) session.interactionEvents.push({ type: 'validated-patient-turn', axes: session.interactionEvents.length ? ['context', 'safePlan'] : ['foodHistory', 'communication'] });
         session.messageCount++;
 
+        if (session.mission && isNursingMission(session.mission)) {
+            const extractedIds = await extractionWithTimeout(client, session, response);
+            session.liveSymptomIds = [...new Set([...(session.liveSymptomIds || []), ...extractedIds])];
+            const symptoms = nursingLiveSymptoms(session, session.liveSymptomIds);
+            const pins = sanitizeNursingPins(session, session.symptomPins || []);
+            session.symptomPins = pins;
+            return res.json({ message: response, nursing: { symptoms, pins } });
+        }
         res.json({ message: response });
     } catch (err) {
         console.error('Chat error:', err.message);

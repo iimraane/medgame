@@ -40,31 +40,65 @@ export async function renderChat(container, missionId) {
       rail.querySelector('#submit-hypothesis').disabled = false;
       selectionStatus.textContent = `${disease.name} est sélectionnée. Vous pouvez maintenant soumettre l’hypothèse.`;
     };
-    let holdTimer; let holdFrame; let heldButton; let suppressClickFor;
+    const HOLD_DURATION = 850;
+    const HOLD_MOVE_TOLERANCE = 12;
+    let holdTimer; let holdFrame; let heldButton; let heldPointerId; let holdOrigin; let suppressClickFor; let suppressClickPointerId; let suppressClickCleanup;
+    const clearSuppressedClick = () => { clearTimeout(suppressClickCleanup); suppressClickFor = undefined; suppressClickPointerId = undefined; };
+    const expireSuppressionAfterPointerUp = (event) => {
+      if (suppressClickFor && event.pointerId === suppressClickPointerId) {
+        clearTimeout(suppressClickCleanup);
+        suppressClickCleanup = setTimeout(clearSuppressedClick, 0);
+      }
+    };
     const cancelForWindowBlur = () => cancelHold();
-    const cancelHold = () => { clearTimeout(holdTimer); cancelAnimationFrame(holdFrame); window.removeEventListener('blur', cancelForWindowBlur); if (heldButton) { heldButton.classList.remove('is-holding'); heldButton.style.removeProperty('--hold-progress'); } heldButton = undefined; };
+    const cancelHold = () => {
+      clearTimeout(holdTimer); cancelAnimationFrame(holdFrame); window.removeEventListener('blur', cancelForWindowBlur);
+      if (heldButton) {
+        if (heldPointerId !== undefined && heldButton.hasPointerCapture?.(heldPointerId)) heldButton.releasePointerCapture(heldPointerId);
+        heldButton.classList.remove('is-holding'); heldButton.style.removeProperty('--hold-progress');
+      }
+      heldButton = undefined; heldPointerId = undefined; holdOrigin = undefined;
+    };
     const beginHold = (button, event) => {
       if (event.button !== undefined && event.button !== 0) return;
-      cancelHold(); heldButton = button; button.classList.add('is-holding');
+      if (event.isPrimary === false || heldButton) return;
+      heldButton = button; heldPointerId = event.pointerId; holdOrigin = { x: event.clientX, y: event.clientY }; button.classList.add('is-holding');
+      if (event.pointerId !== undefined) button.setPointerCapture?.(event.pointerId);
       window.addEventListener('blur', cancelForWindowBlur);
       const startedAt = performance.now();
-      const animate = (now) => { if (heldButton !== button) return; button.style.setProperty('--hold-progress', String(Math.min(1, (now - startedAt) / 850))); holdFrame = requestAnimationFrame(animate); };
+      const animate = (now) => { if (heldButton !== button) return; button.style.setProperty('--hold-progress', String(Math.min(1, (now - startedAt) / HOLD_DURATION))); holdFrame = requestAnimationFrame(animate); };
       holdFrame = requestAnimationFrame(animate);
-      holdTimer = setTimeout(() => { if (heldButton !== button) return; cancelHold(); selectDisease(button); suppressClickFor = button; }, 850);
+      holdTimer = setTimeout(() => {
+        if (heldButton !== button) return;
+        const completedPointerId = heldPointerId;
+        cancelHold(); selectDisease(button); suppressClickFor = button; suppressClickPointerId = completedPointerId;
+      }, HOLD_DURATION);
     };
     differential.querySelectorAll('[data-disease]').forEach((button) => {
       button.setAttribute('aria-haspopup', 'dialog');
       button.addEventListener('pointerdown', (event) => beginHold(button, event));
-      button.addEventListener('pointerup', () => { cancelHold(); if (suppressClickFor === button) setTimeout(() => { if (suppressClickFor === button) suppressClickFor = undefined; }, 0); });
-      ['pointercancel', 'pointerleave', 'lostpointercapture', 'blur'].forEach((name) => button.addEventListener(name, () => { cancelHold(); if (suppressClickFor === button) suppressClickFor = undefined; }));
+      button.addEventListener('pointermove', (event) => {
+        if (heldButton !== button || heldPointerId !== event.pointerId || !holdOrigin) return;
+        if (Math.hypot(event.clientX - holdOrigin.x, event.clientY - holdOrigin.y) > HOLD_MOVE_TOLERANCE) cancelHold();
+      });
+      button.addEventListener('pointerup', (event) => {
+        if (heldButton === button && heldPointerId === event.pointerId) cancelHold();
+        expireSuppressionAfterPointerUp(event);
+      });
+      button.addEventListener('pointerleave', (event) => { if (heldButton === button && heldPointerId === event.pointerId && !button.hasPointerCapture?.(event.pointerId)) cancelHold(); });
+      ['pointercancel', 'lostpointercapture'].forEach((name) => button.addEventListener(name, (event) => { if (heldButton === button && heldPointerId === event.pointerId) cancelHold(); }));
+      button.addEventListener('blur', cancelHold);
       button.addEventListener('keydown', (event) => { if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) { event.preventDefault(); beginHold(button, event); } });
       button.addEventListener('keyup', (event) => {
         if (event.key !== ' ' && event.key !== 'Enter') return;
         event.preventDefault(); const wasHeld = heldButton === button; cancelHold();
-        if (suppressClickFor === button) { suppressClickFor = undefined; return; }
+        if (suppressClickFor === button) { clearSuppressedClick(); return; }
         if (wasHeld) { const disease = data.differential.find((item) => item.id === button.dataset.disease); if (disease) showDiseaseDetails(disease, button); }
       });
-      button.addEventListener('click', (event) => { if (heldButton === button || suppressClickFor === button) { event.preventDefault(); suppressClickFor = undefined; return; } const disease = data.differential.find((item) => item.id === button.dataset.disease); if (disease) showDiseaseDetails(disease, button); });
+      button.addEventListener('click', (event) => {
+        if (suppressClickFor === button) { event.preventDefault(); clearSuppressedClick(); return; }
+        const disease = data.differential.find((item) => item.id === button.dataset.disease); if (disease) showDiseaseDetails(disease, button);
+      });
     });
     if (data.tools?.length) { renderNursingTools(data.tools); engine.onTools = renderNursingTools; } else { toolsRail.remove(); chatBody.classList.add('chat__body--nursing-no-documents'); }
     engine.onNursingSymptoms = (found) => renderSymptoms(found);
@@ -119,7 +153,7 @@ export async function renderChat(container, missionId) {
       const week = calendar.querySelector('.consultation-calendar__week'); tool.evidence.days.forEach((entry) => { const day = document.createElement('article'); day.className = 'consultation-calendar__day'; day.innerHTML = `<h3>${entry.day} <span>${entry.date}</span></h3><ul></ul>`; entry.slots.forEach((slot) => { const slotElement = document.createElement('li'); slotElement.textContent = slot; day.querySelector('ul').append(slotElement); }); week.append(day); }); toolContent.append(calendar);
     } else if (tool.kind === 'nursing-document') {
       const docPanel = document.createElement('section'); docPanel.className = 'consultation-evidence consultation-evidence--nursing-document';
-      const label = document.createElement('p'); label.className = 'consultation-evidence__disclaimer'; label.textContent = 'Support fictif de simulation'; docPanel.append(label);
+      const label = document.createElement('p'); label.className = 'consultation-evidence__disclaimer'; label.textContent = 'Repères d’apprentissage liés au cas en cours, sans consigne de soins.'; docPanel.append(label);
       tool.evidence.facts.forEach((fact) => { const item = document.createElement('p'); item.textContent = fact; docPanel.append(item); }); toolContent.append(docPanel);
     } else {
       const panel = document.createElement('div'); panel.className = `consultation-evidence consultation-evidence--${tool.kind}`; tool.evidence.notes.forEach((note, index) => { const item = document.createElement('div'); item.className = 'consultation-evidence__item'; item.innerHTML = `<span>${tool.kind === 'journal' ? ['Matin', 'Après-midi'][index] : ['Réserve', 'Réfrigérateur'][index]}</span><p></p>`; item.querySelector('p').textContent = note; panel.append(item); }); toolContent.append(panel);

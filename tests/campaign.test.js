@@ -5,7 +5,7 @@ import { MISSIONS } from '../src/data/missions.js';
 import { CASES, NURSING_CASES, MASTERY_THRESHOLD, chooseVariant, getEligibleTools, useConsultationTool, getNursingTools, useNursingTool, nursingLiveSymptoms, evaluateNursingHypothesis, evaluateServerMission } from '../server/missions.js';
 import { NURSING_POOL_SIZES } from '../src/data/nursingCampaign.js';
 import { NURSING_DISEASES } from '../src/data/nursingCampaign.js';
-import { NURSING_DOSSIERS, NURSING_DOCUMENT_DEFINITIONS } from '../server/nursingDossiers.js';
+import { NURSING_DOSSIERS, NURSING_DOCUMENT_DEFINITIONS, materializeNursingDossier } from '../server/nursingDossiers.js';
 import { buildMissionEvaluationPrompt, normalizeMissionEvaluation } from '../server/missionEvaluation.js';
 import { buildMissionPatientPrompt } from '../server/missionPatient.js';
 import { PATIENT_TRAITS } from '../server/patientTraits.js';
@@ -55,12 +55,28 @@ test('Nursing disease pools use distinct concrete signs and only expose the auth
       const first = useNursingTool(variant, tool.id);
       const reopened = useNursingTool(variant, tool.id, [tool.id]);
       assert.ok(first?.evidence?.facts?.length >= 3, `${mission.id}: ${tool.id}`);
-      assert.deepEqual(first.evidence, NURSING_DOSSIERS[variant.diseaseId][tool.id]);
+      assert.deepEqual(first.evidence, variant.evidence[tool.id]);
       assert.equal(reopened.alreadyConsulted, true);
     }
     const expectedCount = NURSING_DOCUMENT_DEFINITIONS.filter(([, unlock]) => mission.order >= unlock).length;
     assert.equal(getNursingTools(mission).length, expectedCount);
     assert.deepEqual(getNursingTools(mission).map(({ id, label }) => [id, label]), NURSING_DOCUMENT_DEFINITIONS.filter(([, unlock]) => mission.order >= unlock).map(([id, _unlock, label]) => [id, label]));
+  }
+});
+
+test('Nursing documents are concrete, case-bound, and do not reveal a diagnosis', () => {
+  for (const diseaseId of Object.keys(NURSING_DISEASES)) {
+    const variants = Array.from({ length: 6 }, (_, index) => materializeNursingDossier(diseaseId, index));
+    for (const documentId of NURSING_DOCUMENT_DEFINITIONS.map(([id]) => id)) {
+      const factSets = variants.map((dossier) => dossier[documentId].facts);
+      assert.equal(new Set(factSets.map((facts) => JSON.stringify(facts))).size, 6, `${diseaseId}/${documentId} varies by case`);
+      for (const facts of factSets) {
+        const text = facts.join(' ');
+        assert.doesNotMatch(text, /ficti(?:f|ve)/i);
+        assert.doesNotMatch(text, new RegExp(NURSING_DISEASES[diseaseId].name, 'i'));
+        assert.match(facts.at(-1), /(Arrivée enregistrée|Mesure notée|Prélèvement horodaté|Observation consignée|Transmission datée)/);
+      }
+    }
   }
 });
 
@@ -299,6 +315,8 @@ test('Nursing hypotheses separate a short-click information popup from a held se
   assert.match(chatSource, /pointerdown/);
   assert.match(chatSource, /pointerleave/);
   assert.match(chatSource, /lostpointercapture/);
+  assert.match(chatSource, /setPointerCapture/);
+  assert.match(chatSource, /HOLD_MOVE_TOLERANCE/);
   assert.match(chatSource, /window\.addEventListener\('blur', cancelForWindowBlur\)/);
   assert.match(chatSource, /event\.preventDefault\(\)/);
   assert.match(chatSource, /setTimeout\(\(\) => \{/);
@@ -309,4 +327,12 @@ test('Nursing hypotheses separate a short-click information popup from a held se
   assert.match(styleSource, /nursing-hypothesis-hint/);
   assert.match(chatSource, /aria-describedby="nursing-hypothesis-hint"/);
   assert.match(chatSource, /nursing-selection-status/);
+});
+
+test('game-result debrief keeps replay and map paths while exposing a clear outcome', () => {
+  const source = fs.readFileSync(new URL('../src/ui/debrief.js', import.meta.url), 'utf8');
+  assert.match(source, /debrief--game-result/);
+  assert.match(source, /MISSION RÉUSSIE/);
+  assert.match(source, /id="retry"/);
+  assert.match(source, /id="map"/);
 });

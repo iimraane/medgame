@@ -2,7 +2,7 @@ import fs from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { NURSING_POOLS, NURSING_DISEASES } from '../src/data/nursingCampaign.js';
-import { NURSING_DOCUMENT_DEFINITIONS, getNursingDossier } from './nursingDossiers.js';
+import { NURSING_DOCUMENT_DEFINITIONS, materializeNursingDossier } from './nursingDossiers.js';
 
 export const MASTERY_THRESHOLD = 70;
 const AXES = ['foodHistory', 'context', 'communication', 'safePlan'];
@@ -124,8 +124,8 @@ function makeBlueprint(frame, index) {
 export const CASES = Object.fromEntries(frames.map((frame, order) => [frame[0], { id: frame[0], order: order + 1, theme: frame[1], blueprints: Array.from({ length: 6 }, (_, index) => makeBlueprint(frame, index)) }]));
 const NURSING_PATIENTS = [{ name: 'Alex', gender: 'Homme' }, { name: 'Sam', gender: 'Homme' }, { name: 'Lina', gender: 'Femme' }, { name: 'Morgan', gender: 'Homme' }, { name: 'Noor', gender: 'Femme' }, { name: 'Camille', gender: 'Femme' }];
 const NURSING_VARIANT_STYLES = ['répond brièvement mais précisément', 'minimise au début', 'retrace volontiers la chronologie', 'aborde difficilement certains détails', 's’appuie sur des notes personnelles', 'la fatigue est présente mais la personne reste coopérative'];
-function nursingDocuments(order, diseaseId) {
-  const dossier = getNursingDossier(diseaseId);
+function nursingDocuments(order, diseaseId, variantIndex) {
+  const dossier = materializeNursingDossier(diseaseId, variantIndex);
   if (!dossier) return {};
   return Object.fromEntries(NURSING_DOCUMENT_DEFINITIONS
     .filter(([, unlock]) => order >= unlock)
@@ -137,7 +137,7 @@ function makeNursingMission(pool) {
     id: `${pool.order}-${disease.id}-case-${index + 1}`, diseaseId: disease.id, patient: { ...NURSING_PATIENTS[index], age: 27 + ((index * 6 + pool.order) % 38) }, responseStyle: NURSING_VARIANT_STYLES[index],
     opening: ['Je ne me sens pas comme d’habitude depuis quelques jours.', 'Je voulais en parler parce que ça change dans mon quotidien.', 'J’ai noté des choses, mais je ne sais pas ce qui est utile.'][index % 3],
     symptoms: disease.symptoms.map((label, symptomIndex) => ({ id: `${disease.id}-symptom-${symptomIndex + 1}`, label })),
-    evidence: nursingDocuments(pool.order, disease.id),
+    evidence: nursingDocuments(pool.order, disease.id, index),
   }))) };
 }
 export const NURSING_CASES = Object.freeze(Object.fromEntries(NURSING_POOLS.map((pool) => [`nursing-${pool.order}`, makeNursingMission(pool)])));
@@ -193,7 +193,7 @@ export function evaluateNursingHypothesis(session, diseaseId) {
       safePlan: { count: correct ? 1 : 0, message: correct ? 'La bonne maladie a été identifiée.' : 'La maladie sélectionnée ne correspond pas au cas.' },
     },
     improvement: correct ? 'Bonne identification : le niveau suivant est déverrouillé.' : 'Rejouez cette mission pour essayer une autre maladie.',
-    feedback: correct ? 'Bonne maladie identifiée dans cette simulation fictive.' : 'La maladie choisie ne correspond pas à ce cas fictif.',
+    feedback: correct ? 'Bonne maladie identifiée pour ce cas.' : 'La maladie choisie ne correspond pas à ce cas.',
   };
 }
 export function getEligibleTools(mission) { return mission ? TOOL_DEFINITIONS.filter((tool) => mission.order >= tool.unlockOrder).map(({ id, label, kind }) => ({ id, label, kind })) : []; }

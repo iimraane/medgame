@@ -29,7 +29,7 @@ test('Nursing HTTP flow returns level-gated, case-authorized reusable evidence',
     session.messages.push({ role: 'assistant', content: symptom.label });
     const document = await post('/game/api/consultation-tool', { sessionId: start.body.sessionId, toolId: 'nursing-document-2' });
     assert.equal(document.status, 200); assert.ok(document.body.tool.evidence.facts.length >= 4);
-    assert.deepEqual(document.body.tool.evidence, NURSING_DOSSIERS[session.variant.diseaseId]['nursing-document-2']);
+    assert.deepEqual(document.body.tool.evidence, session.variant.evidence['nursing-document-2']);
     const usedCount = session.usedTools.length;
     const reopened = await post('/game/api/consultation-tool', { sessionId: start.body.sessionId, toolId: 'nursing-document-2' });
     assert.deepEqual(reopened.body.tool.evidence, document.body.tool.evidence);
@@ -146,7 +146,7 @@ test('a level 10 Nursing session exposes all five documents from only its select
     for (const { id } of start.body.tools) {
       const response = await post('/game/api/consultation-tool', { sessionId: start.body.sessionId, toolId: id });
       assert.equal(response.status, 200);
-      assert.deepEqual(response.body.tool.evidence, NURSING_DOSSIERS[session.variant.diseaseId][id]);
+      assert.deepEqual(response.body.tool.evidence, session.variant.evidence[id]);
     }
     assert.equal(session.usedTools.length, 5);
     const promptAfterFirstOpen = session.prompt;

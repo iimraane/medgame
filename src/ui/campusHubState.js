@@ -10,6 +10,10 @@ export function resolveCampusSelection(roleId, getDoorAction, previewOpen = fals
   return action.roleId ? { kind: 'levels', roleId: action.roleId } : { kind: 'preview', feedback: action.feedback };
 }
 
+export function shouldExitCampusOnEscape(previewOpen, key) {
+  return key === 'Escape' && !previewOpen;
+}
+
 export function createCampusLifecycle(setTimer, clearTimer) {
   let loadingTimer = null;
   let disposeScene = () => {};

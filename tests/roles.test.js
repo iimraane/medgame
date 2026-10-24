@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import { ROLES, getCampusHubSummary, getDoorAction, getRole } from '../src/data/roles.js';
 import { isCampusDesktop } from '../src/ui/campusPanelState.js';
-import { canInitializeCampus, createCampusLifecycle, resolveCampusSelection } from '../src/ui/campusHubState.js';
+import { canInitializeCampus, createCampusLifecycle, resolveCampusSelection, shouldExitCampusOnEscape } from '../src/ui/campusHubState.js';
 import { createOriginGuard, getAllowedOrigins, isAllowedOrigin } from '../server/origins.js';
 
 const hub = fs.readFileSync(new URL('../src/ui/campusHub.js', import.meta.url), 'utf8');
@@ -19,7 +19,11 @@ test('the campus config exposes five editable 3D door destinations', () => {
     assert.equal(role.campus.position.length, 3);
     assert.equal(role.campus.footprint.length, 3);
     assert.match(role.campus.accent, /^#/);
+    assert.ok(['greenhouse', 'clinic', 'atelier', 'conservatory', 'tower'].includes(role.campus.silhouette));
+    assert.ok(role.campus.sign);
+    assert.ok(role.campus.materialAccent);
   }
+  assert.equal(new Set(Object.values(ROLES).map((role) => role.campus.silhouette)).size, 5);
 });
 
 test('the hub uses local Three.js doors with a semantic destination list', () => {
@@ -27,29 +31,30 @@ test('the hub uses local Three.js doors with a semantic destination list', () =>
   assert.match(hub, /new THREE\.WebGLRenderer/);
   assert.match(hub, /new THREE\.Raycaster/);
   assert.match(hub, /class="campus-canvas"/);
-  assert.match(hub, /class="campus-destination-list"/);
+  assert.match(hub, /class="campus-destination-list/);
+  assert.match(hub, /campus-destination-list--sr-only/);
+  assert.match(hub, /createSignTexture/);
+  assert.match(hub, /medical-concrete-glass-atlas\.png/);
+  assert.match(hub, /shouldExitCampusOnEscape/);
   assert.doesNotMatch(hub, /campus-hub\.png|campus-panel-|campus-kiosk|campus-directory|new Image\(/);
   assert.match(hub, /door\.name = doorId/);
   assert.match(css, /\.campus-canvas/);
 });
 
-test('the HUD and playable destinations derive from role data', () => {
+test('playable destination data remains available without visible scene chrome', () => {
   const summary = getCampusHubSummary();
   assert.equal(summary.playableCount, 2);
   assert.equal(summary.playableLabel, '2 parcours jouables');
   assert.equal(summary.playableShare, '40%');
   assert.deepEqual(summary.roleStates.filter((role) => role.state === 'playable').map((role) => role.id), ['dietetics', 'nursing']);
-  assert.match(hub, /Campus MedGame/);
-  assert.match(hub, /\$\{hubSummary\.playableLabel\}/);
+  assert.doesNotMatch(hub, /class="campus-hud"/);
   assert.match(hub, /role\.unlocked \? 'Parcours jouable' : role\.unlockRequirement/);
 });
 
-test('locked role previews disable destinations and restore focus to their invoker', () => {
-  assert.match(hub, /destinations\.forEach\(\(destination\) => \{ destination\.disabled = true; \}\);/);
-  assert.match(hub, /destinations\.forEach\(\(destination\) => \{ destination\.disabled = false; \}\);/);
-  assert.match(hub, /previewInvoker\?\.focus\(\);/);
-  assert.match(hub, /closePreview\.focus\(\);/);
-  assert.match(hub, /data-preview-close/);
+test('locked destinations announce availability without opening a screen panel', () => {
+  assert.match(hub, /feedback\.textContent = `\$\{role\.label\} : \$\{role\.unlockRequirement\}\.`;/);
+  assert.doesNotMatch(hub, /class="campus-preview"/);
+  assert.doesNotMatch(hub, /class="campus-hud"/);
 });
 
 test('role selection enters only playable routes and previews locked doors', () => {
@@ -93,6 +98,15 @@ test('the campus remains desktop-only and routes/beacon respect reduced motion',
   assert.match(css, /@media \(max-width: 1023px\) \{ \.campus-scene \{ display: none;/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(css, /\.campus-destination-list button:focus-visible/);
+  assert.match(css, /\.campus-destination-list--sr-only/);
+  assert.match(css, /\.campus-scene--fallback \.campus-destination-list/);
+  assert.doesNotMatch(css, /\.campus-scene__exit/);
+});
+
+test('Escape returns only outside an open preview', () => {
+  assert.equal(shouldExitCampusOnEscape(false, 'Escape'), true);
+  assert.equal(shouldExitCampusOnEscape(true, 'Escape'), false);
+  assert.equal(shouldExitCampusOnEscape(false, 'Enter'), false);
 });
 
 test('the Three.js lifecycle cancels rendering and removes hub listeners', () => {

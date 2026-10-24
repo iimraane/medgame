@@ -6,9 +6,8 @@ export const ROLES = {
     icon: '🥕',
     description: 'Explorer les habitudes, les contraintes et des objectifs réalistes, sans prescription personnalisée.',
     theme: 'dietetics',
-    panelAsset: 'campus-panel-dietetics.png',
     unlocked: true,
-    hotspot: { left: 2.8, top: 12.4, width: 16, height: 51.5 },
+    campus: { left: 7, top: 34, width: 19, height: 42, landmark: 'Serre nutrition', preview: 'Des situations concrètes pour observer les habitudes et imaginer des choix réalistes.' },
     manual: {
       purpose: 'Comprendre les habitudes de vie et accompagner des objectifs alimentaires réalistes.',
       skills: ['Mener une anamnèse alimentaire', 'Adapter sa communication au contexte', 'Construire un plan sûr et réalisable'],
@@ -22,10 +21,9 @@ export const ROLES = {
     icon: '🩺',
     description: 'Observer, orienter et coordonner le parcours de soin.',
     theme: 'general-practice',
-    panelAsset: 'campus-panel-general-practice.png',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
-    hotspot: { left: 25, top: 27.6, width: 12, height: 33.4 },
+    campus: { left: 27, top: 25, width: 18, height: 38, landmark: 'Pavillon de liaison', preview: 'Un futur parcours pour trier les informations et orienter avec justesse.' },
     manual: {
       purpose: 'Observer, orienter et coordonner les étapes d’un parcours de soin.',
       skills: ['Prioriser les informations', 'Repérer les signaux d’alerte', 'Orienter de façon sécurisée'],
@@ -39,9 +37,8 @@ export const ROLES = {
     icon: '🩹',
     description: 'Accompagner, surveiller et soutenir au plus près du quotidien.',
     theme: 'nursing',
-    panelAsset: 'campus-panel-nursing.png',
     unlocked: true,
-    hotspot: { left: 42.8, top: 34.7, width: 10.8, height: 25.5 },
+    campus: { left: 45, top: 37, width: 16, height: 35, landmark: 'Atelier du soin', preview: 'Un parcours vivant autour de l’observation, des transmissions et de l’autonomie.' },
     manual: {
       purpose: 'Accompagner, surveiller et soutenir les personnes dans leur quotidien de soin.',
       skills: ['Observer une évolution', 'Transmettre une information utile', 'Soutenir l’autonomie'],
@@ -55,10 +52,9 @@ export const ROLES = {
     icon: '💬',
     description: 'Écouter avec attention et créer un espace de parole sûr.',
     theme: 'psychology',
-    panelAsset: 'campus-panel-psychology.png',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
-    hotspot: { left: 72.7, top: 37.2, width: 8.2, height: 23.4 },
+    campus: { left: 64, top: 27, width: 15, height: 38, landmark: 'Belvédère écoute', preview: 'Un futur espace de pratique pour créer une parole sûre et attentive.' },
     manual: {
       purpose: 'Créer un espace d’écoute sûr et comprendre les facteurs psychologiques.',
       skills: ['Écoute active', 'Reformulation', 'Repérage des besoins d’orientation'],
@@ -72,10 +68,9 @@ export const ROLES = {
     icon: '⚗️',
     description: 'Informer et sécuriser le bon usage des traitements.',
     theme: 'pharmacy',
-    panelAsset: 'campus-panel-pharmacy.png',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
-    hotspot: { left: 85.9, top: 30, width: 11.3, height: 30.4 },
+    campus: { left: 80, top: 35, width: 15, height: 40, landmark: 'Tour des remèdes', preview: 'Un futur parcours pour rendre les traitements plus clairs et plus sûrs.' },
     manual: {
       purpose: 'Informer et sécuriser le bon usage des traitements au plus près des personnes.',
       skills: ['Expliquer un traitement', 'Prévenir les risques', 'Orienter vers le bon interlocuteur'],
@@ -86,10 +81,15 @@ export const ROLES = {
 
 export function getRole(roleId) { return ROLES[roleId]; }
 
-export function getCampusPanelAction(roleId) {
-  const role = getRole(roleId);
-  if (!role?.panelAsset) return { feedback: 'Ce panneau ne peut pas être chargé pour le moment.' };
-  return { roleId: role.id, panelAsset: role.panelAsset };
+export function getCampusHubSummary(roles = Object.values(ROLES)) {
+  const playableRoles = roles.filter((role) => role.unlocked);
+  const playableCount = playableRoles.length;
+  return {
+    playableCount,
+    playableLabel: `${playableCount} parcours jouable${playableCount === 1 ? '' : 's'}`,
+    playableShare: `${(playableCount / roles.length) * 100}%`,
+    roleStates: roles.map((role) => ({ id: role.id, state: role.unlocked ? 'playable' : 'preview' })),
+  };
 }
 
 export function getDoorAction(roleId) {

@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
+import * as THREE from 'three';
 import { ROLES, getCampusHubSummary, getDoorAction, getRole } from '../src/data/roles.js';
+import { animateArcadePortals, createCampusBuildings, setArcadePortalHighlight } from '../src/ui/campusBuildings.js';
 import { isCampusDesktop } from '../src/ui/campusPanelState.js';
 import { canInitializeCampus, createCampusLifecycle, resolveCampusSelection, shouldExitCampusOnEscape } from '../src/ui/campusHubState.js';
 import { createOriginGuard, getAllowedOrigins, isAllowedOrigin } from '../server/origins.js';
@@ -10,7 +12,7 @@ import { createOriginGuard, getAllowedOrigins, isAllowedOrigin } from '../server
 const hub = fs.readFileSync(new URL('../src/ui/campusHub.js', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
 
-test('the campus config exposes five editable 3D door destinations', () => {
+test('the campus config exposes five uniform opaque house destinations', () => {
   assert.deepEqual(Object.keys(ROLES), ['dietetics', 'generalPractice', 'nursing', 'psychology', 'pharmacy']);
   for (const role of Object.values(ROLES)) {
     assert.ok(role.campus.landmark);
@@ -19,11 +21,25 @@ test('the campus config exposes five editable 3D door destinations', () => {
     assert.equal(role.campus.position.length, 3);
     assert.equal(role.campus.footprint.length, 3);
     assert.match(role.campus.accent, /^#/);
-    assert.ok(['greenhouse', 'clinic', 'atelier', 'conservatory', 'tower'].includes(role.campus.silhouette));
+    assert.equal(role.campus.silhouette, 'house');
     assert.ok(role.campus.sign);
     assert.ok(role.campus.materialAccent);
   }
-  assert.equal(new Set(Object.values(ROLES).map((role) => role.campus.silhouette)).size, 5);
+  assert.equal(new Set(Object.values(ROLES).map((role) => JSON.stringify(role.campus.footprint))).size, 1);
+  assert.equal(new Set(Object.values(ROLES).map((role) => role.campus.materialAccent)).size, 1);
+  assert.deepEqual(Object.values(ROLES).map(({ id, unlocked, campus }) => [id, campus.position, campus.accent, campus.sign, unlocked]), [
+    ['dietetics', [-7.2, 0, 1.4], '#8ee6a9', 'SERRE NUTRITION', true], ['generalPractice', [-3.7, 0, -2.2], '#8dc7ff', 'CLINIQUE · SOINS PRIMAIRES', false], ['nursing', [0, 0, 1.1], '#c5a7ff', 'ATELIER DU SOIN', true], ['psychology', [4, 0, -2], '#fa9bb5', 'CONSERVATOIRE · ÉCOUTE', false], ['pharmacy', [7.3, 0, 1.2], '#77e9cb', 'PHARMACIE · REMÈDES', false],
+  ]);
+});
+
+test('constructed campus houses stay opaque and attach arcade portals only to playable doors', () => {
+  const { doors, buildings } = createCampusBuildings(Object.values(ROLES), () => new THREE.Texture());
+  assert.equal(buildings.length, 5); assert.equal(doors.length, 5);
+  for (const building of buildings) for (const name of ['campus-house-wall', 'campus-house-roof', 'campus-house-window', 'campus-profession-sign']) assert.equal(building.getObjectByName(name).material.transparent, false);
+  const portalDoors = doors.filter((door) => door.userData.portal); assert.deepEqual(portalDoors.map((door) => door.userData.roleId), ['dietetics', 'nursing']);
+  assert.equal(portalDoors.every((door) => !doors.includes(door.userData.portal.portal)), true);
+  const portal = portalDoors[0].userData.portal; setArcadePortalHighlight(portalDoors[0], true); assert.equal(portal.light.intensity, 3.5); assert.equal(portal.portal.scale.x, 1.09);
+  animateArcadePortals(portalDoors, 520, true); assert.equal(portal.chevrons.position.y, 0); assert.equal(portal.portal.rotation.y, 0);
 });
 
 test('the hub uses local Three.js doors with a semantic destination list', () => {
@@ -37,7 +53,8 @@ test('the hub uses local Three.js doors with a semantic destination list', () =>
   assert.match(hub, /medical-concrete-glass-atlas\.png/);
   assert.match(hub, /shouldExitCampusOnEscape/);
   assert.doesNotMatch(hub, /campus-hub\.png|campus-panel-|campus-kiosk|campus-directory|new Image\(/);
-  assert.match(hub, /door\.name = doorId/);
+  assert.match(hub, /createCampusBuildings/);
+  assert.doesNotMatch(hub, /silhouette ===/);
   assert.match(css, /\.campus-canvas/);
 });
 

@@ -7,7 +7,7 @@ export const ROLES = {
     description: 'Explorer les habitudes, les contraintes et des objectifs réalistes, sans prescription personnalisée.',
     theme: 'dietetics',
     unlocked: true,
-    campus: { doorId: 'door-dietetics', position: [-7.2, 0, 1.4], footprint: [4.2, 3.4, 3], accent: '#8ee6a9', landmark: 'Serre nutrition', silhouette: 'greenhouse', sign: 'SERRE NUTRITION', materialAccent: 'planted glass', preview: 'Des situations concrètes pour observer les habitudes et imaginer des choix réalistes.' },
+    campus: { doorId: 'door-dietetics', position: [-7.2, 0, 1.4], footprint: [3.8, 4.2, 3.2], accent: '#8ee6a9', landmark: 'Serre nutrition', silhouette: 'house', sign: 'SERRE NUTRITION', materialAccent: 'warm concrete', preview: 'Des situations concrètes pour observer les habitudes et imaginer des choix réalistes.' },
     manual: {
       purpose: 'Comprendre les habitudes de vie et accompagner des objectifs alimentaires réalistes.',
       skills: ['Mener une anamnèse alimentaire', 'Adapter sa communication au contexte', 'Construire un plan sûr et réalisable'],
@@ -23,7 +23,7 @@ export const ROLES = {
     theme: 'general-practice',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
-    campus: { doorId: 'door-general-practice', position: [-3.7, 0, -2.2], footprint: [3.8, 4.2, 3.4], accent: '#8dc7ff', landmark: 'Clinique de première ligne', silhouette: 'clinic', sign: 'CLINIQUE · SOINS PRIMAIRES', materialAccent: 'blue ceramic', preview: 'Un futur parcours pour trier les informations et orienter avec justesse.' },
+    campus: { doorId: 'door-general-practice', position: [-3.7, 0, -2.2], footprint: [3.8, 4.2, 3.2], accent: '#8dc7ff', landmark: 'Clinique de première ligne', silhouette: 'house', sign: 'CLINIQUE · SOINS PRIMAIRES', materialAccent: 'warm concrete', preview: 'Un futur parcours pour trier les informations et orienter avec justesse.' },
     manual: {
       purpose: 'Observer, orienter et coordonner les étapes d’un parcours de soin.',
       skills: ['Prioriser les informations', 'Repérer les signaux d’alerte', 'Orienter de façon sécurisée'],
@@ -38,7 +38,7 @@ export const ROLES = {
     description: 'Accompagner, surveiller et soutenir au plus près du quotidien.',
     theme: 'nursing',
     unlocked: true,
-    campus: { doorId: 'door-nursing', position: [0, 0, 1.1], footprint: [3.6, 3.6, 3.1], accent: '#c5a7ff', landmark: 'Atelier du soin', silhouette: 'atelier', sign: 'ATELIER DU SOIN', materialAccent: 'violet anodized metal', preview: 'Un parcours vivant autour de l’observation, des transmissions et de l’autonomie.' },
+    campus: { doorId: 'door-nursing', position: [0, 0, 1.1], footprint: [3.8, 4.2, 3.2], accent: '#c5a7ff', landmark: 'Atelier du soin', silhouette: 'house', sign: 'ATELIER DU SOIN', materialAccent: 'warm concrete', preview: 'Un parcours vivant autour de l’observation, des transmissions et de l’autonomie.' },
     manual: {
       purpose: 'Accompagner, surveiller et soutenir les personnes dans leur quotidien de soin.',
       skills: ['Observer une évolution', 'Transmettre une information utile', 'Soutenir l’autonomie'],
@@ -54,7 +54,7 @@ export const ROLES = {
     theme: 'psychology',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
-    campus: { doorId: 'door-psychology', position: [4, 0, -2], footprint: [3.6, 4.5, 3.2], accent: '#fa9bb5', landmark: 'Conservatoire de l’écoute', silhouette: 'conservatory', sign: 'CONSERVATOIRE · ÉCOUTE', materialAccent: 'rose timber fins', preview: 'Un futur espace de pratique pour créer une parole sûre et attentive.' },
+    campus: { doorId: 'door-psychology', position: [4, 0, -2], footprint: [3.8, 4.2, 3.2], accent: '#fa9bb5', landmark: 'Conservatoire de l’écoute', silhouette: 'house', sign: 'CONSERVATOIRE · ÉCOUTE', materialAccent: 'warm concrete', preview: 'Un futur espace de pratique pour créer une parole sûre et attentive.' },
     manual: {
       purpose: 'Créer un espace d’écoute sûr et comprendre les facteurs psychologiques.',
       skills: ['Écoute active', 'Reformulation', 'Repérage des besoins d’orientation'],
@@ -70,7 +70,7 @@ export const ROLES = {
     theme: 'pharmacy',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
-    campus: { doorId: 'door-pharmacy', position: [7.3, 0, 1.2], footprint: [3.6, 5.1, 3], accent: '#77e9cb', landmark: 'Tour de pharmacie', silhouette: 'tower', sign: 'PHARMACIE · REMÈDES', materialAccent: 'teal ribbed metal', preview: 'Un futur parcours pour rendre les traitements plus clairs et plus sûrs.' },
+    campus: { doorId: 'door-pharmacy', position: [7.3, 0, 1.2], footprint: [3.8, 4.2, 3.2], accent: '#77e9cb', landmark: 'Tour de pharmacie', silhouette: 'house', sign: 'PHARMACIE · REMÈDES', materialAccent: 'warm concrete', preview: 'Un futur parcours pour rendre les traitements plus clairs et plus sûrs.' },
     manual: {
       purpose: 'Informer et sécuriser le bon usage des traitements au plus près des personnes.',
       skills: ['Expliquer un traitement', 'Prévenir les risques', 'Orienter vers le bon interlocuteur'],

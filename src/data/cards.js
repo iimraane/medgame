@@ -139,26 +139,6 @@ export const CARDS = {
         radioExams: "Echo-doppler artériel (recherche d'athérome). Bilan visuel et rénal associés.",
         physicalSigns: "Normal appearance, perhaps slightly overweight, looking a bit tired."
     },
-    asthme: {
-        id: 'asthme',
-        name: 'Asthme',
-        emoji: '💨',
-        category: 'Pneumologie',
-        description: 'Maladie inflammatoire chronique des bronches avec crises de dyspnée.',
-        symptoms: ['Essoufflement', 'Sifflements respiratoires', 'Toux sèche', 'Oppression thoracique', 'Crises nocturnes'],
-        questionsToAsk: [
-            'Quand surviennent les crises ?',
-            'Avez-vous des allergies connues ?',
-            'Utilisez-vous un inhalateur ?',
-            'Fumez-vous ?',
-            'L\'exercice déclenche-t-il des symptômes ?',
-        ],
-        treatment: 'Bronchodilatateurs d\'action rapide en crise. Corticoïdes inhalés en traitement de fond.',
-        redFlags: ['Crise ne cédant pas au bronchodilatateur', 'Difficulté à parler', 'Lèvres bleues', 'Fréquence cardiaque > 120'],
-        labExams: "NFS: Éosinophilie inconstante. IgE totales souvent élevées.",
-        radioExams: "Radio thorax: distension thoracique (hyperclarté, aplatissement des coupoles).",
-        physicalSigns: "Breathing through mouth, looking anxious, slightly pale, hand near chest."
-    },
     angine: {
         id: 'angine',
         name: 'Angine',

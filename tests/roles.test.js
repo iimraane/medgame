@@ -4,31 +4,33 @@ import fs from 'node:fs';
 import http from 'node:http';
 import { ROLES, getCampusHubSummary, getDoorAction, getRole } from '../src/data/roles.js';
 import { isCampusDesktop } from '../src/ui/campusPanelState.js';
+import { canInitializeCampus, createCampusLifecycle, resolveCampusSelection } from '../src/ui/campusHubState.js';
 import { createOriginGuard, getAllowedOrigins, isAllowedOrigin } from '../server/origins.js';
 
 const hub = fs.readFileSync(new URL('../src/ui/campusHub.js', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
 
-test('the original campus config exposes five editable role-driven destinations', () => {
+test('the campus config exposes five editable 3D door destinations', () => {
   assert.deepEqual(Object.keys(ROLES), ['dietetics', 'generalPractice', 'nursing', 'psychology', 'pharmacy']);
   for (const role of Object.values(ROLES)) {
     assert.ok(role.campus.landmark);
     assert.ok(role.campus.preview);
-    for (const coordinate of ['left', 'top', 'width', 'height']) assert.ok(role.campus[coordinate] > 0);
-    assert.ok(role.campus.left + role.campus.width <= 100);
-    assert.ok(role.campus.top + role.campus.height <= 100);
+    assert.match(role.campus.doorId, /^door-/);
+    assert.equal(role.campus.position.length, 3);
+    assert.equal(role.campus.footprint.length, 3);
+    assert.match(role.campus.accent, /^#/);
   }
 });
 
-test('the hub renders semantic original scene layers without campus raster or kiosk hooks', () => {
-  for (const layer of ['campus-sky', 'campus-horizon', 'campus-walkways', 'campus-route-lines', 'campus-beacon', 'campus-destinations']) {
-    assert.match(hub, new RegExp(`class="${layer}`));
-  }
+test('the hub uses local Three.js doors with a semantic destination list', () => {
+  assert.match(hub, /import \* as THREE from 'three'/);
+  assert.match(hub, /new THREE\.WebGLRenderer/);
+  assert.match(hub, /new THREE\.Raycaster/);
+  assert.match(hub, /class="campus-canvas"/);
+  assert.match(hub, /class="campus-destination-list"/);
   assert.doesNotMatch(hub, /campus-hub\.png|campus-panel-|campus-kiosk|campus-directory|new Image\(/);
-  assert.match(hub, /style="\$\{buildingStyle\(role\)\}"/);
-  assert.match(hub, /data-route-state="\$\{state\}"/);
-  assert.match(css, /\.campus-building \{/);
-  assert.match(css, /\.campus-building--pharmacy/);
+  assert.match(hub, /door\.name = doorId/);
+  assert.match(css, /\.campus-canvas/);
 });
 
 test('the HUD and playable destinations derive from role data', () => {
@@ -39,7 +41,7 @@ test('the HUD and playable destinations derive from role data', () => {
   assert.deepEqual(summary.roleStates.filter((role) => role.state === 'playable').map((role) => role.id), ['dietetics', 'nursing']);
   assert.match(hub, /Campus MedGame/);
   assert.match(hub, /\$\{hubSummary\.playableLabel\}/);
-  assert.match(hub, /role\.unlocked \? 'playable' : 'preview'/);
+  assert.match(hub, /role\.unlocked \? 'Parcours jouable' : role\.unlockRequirement/);
 });
 
 test('locked role previews disable destinations and restore focus to their invoker', () => {
@@ -50,21 +52,54 @@ test('locked role previews disable destinations and restore focus to their invok
   assert.match(hub, /data-preview-close/);
 });
 
-test('only Dietetics and Nursing doors start gameplay; locked roles remain previews', () => {
+test('role selection enters only playable routes and previews locked doors', () => {
   assert.deepEqual(getDoorAction('dietetics'), { roleId: 'dietetics' });
   assert.deepEqual(getDoorAction('nursing'), { roleId: 'nursing' });
   for (const role of Object.values(ROLES).filter((candidate) => !candidate.unlocked)) {
     assert.match(getDoorAction(role.id).feedback, new RegExp(`${role.label}.*Bientôt disponible`));
   }
   assert.match(getDoorAction('missing').feedback, /ne peut pas être ouvert/);
+  assert.deepEqual(resolveCampusSelection('dietetics', getDoorAction), { kind: 'levels', roleId: 'dietetics' });
+  assert.deepEqual(resolveCampusSelection('nursing', getDoorAction), { kind: 'levels', roleId: 'nursing' });
+  assert.deepEqual(resolveCampusSelection('psychology', getDoorAction), { kind: 'preview', feedback: 'Psychologie : parcours verrouillé. Bientôt disponible.' });
+  assert.deepEqual(resolveCampusSelection('nursing', getDoorAction, true), { kind: 'ignore' });
+});
+
+test('campus lifecycle cancels pending loading and tears down a scene once', () => {
+  let nextTimer = 0;
+  const callbacks = new Map();
+  const cleared = [];
+  const lifecycle = createCampusLifecycle(
+    (callback) => { const id = ++nextTimer; callbacks.set(id, callback); return id; },
+    (id) => { cleared.push(id); callbacks.delete(id); },
+  );
+  let opened = 0;
+  let disposed = 0;
+  lifecycle.scheduleLoading(() => { opened += 1; }, 850);
+  lifecycle.setSceneDisposer(() => { disposed += 1; });
+  lifecycle.dispose();
+  assert.deepEqual(cleared, [1]);
+  assert.equal(opened, 0);
+  assert.equal(disposed, 1);
+  lifecycle.dispose();
+  assert.equal(disposed, 1);
 });
 
 test('the campus remains desktop-only and routes/beacon respect reduced motion', () => {
   assert.equal(isCampusDesktop(1023), false);
   assert.equal(isCampusDesktop(1024), true);
+  assert.equal(canInitializeCampus(1023), false);
+  assert.equal(canInitializeCampus(1024), true);
   assert.match(css, /@media \(max-width: 1023px\) \{ \.campus-scene \{ display: none;/);
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.campus-route-lines i \{ animation: none;/);
-  assert.match(css, /\.campus-building:focus-visible/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(css, /\.campus-destination-list button:focus-visible/);
+});
+
+test('the Three.js lifecycle cancels rendering and removes hub listeners', () => {
+  assert.match(hub, /window\.cancelAnimationFrame\(frame\)/);
+  assert.match(hub, /renderer\.dispose\(\)/);
+  assert.match(hub, /removeEventListener\('pointermove'/);
+  assert.match(hub, /export function disposeCampusHub/);
 });
 
 test('role identities and manual content remain intact', () => {

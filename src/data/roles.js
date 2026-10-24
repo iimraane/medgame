@@ -7,7 +7,7 @@ export const ROLES = {
     description: 'Explorer les habitudes, les contraintes et des objectifs réalistes, sans prescription personnalisée.',
     theme: 'dietetics',
     unlocked: true,
-    campus: { left: 7, top: 34, width: 19, height: 42, landmark: 'Serre nutrition', preview: 'Des situations concrètes pour observer les habitudes et imaginer des choix réalistes.' },
+    campus: { doorId: 'door-dietetics', position: [-7.2, 0, 1.4], footprint: [4.2, 3.4, 3], accent: '#8ee6a9', landmark: 'Serre nutrition', preview: 'Des situations concrètes pour observer les habitudes et imaginer des choix réalistes.' },
     manual: {
       purpose: 'Comprendre les habitudes de vie et accompagner des objectifs alimentaires réalistes.',
       skills: ['Mener une anamnèse alimentaire', 'Adapter sa communication au contexte', 'Construire un plan sûr et réalisable'],
@@ -23,7 +23,7 @@ export const ROLES = {
     theme: 'general-practice',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
-    campus: { left: 27, top: 25, width: 18, height: 38, landmark: 'Pavillon de liaison', preview: 'Un futur parcours pour trier les informations et orienter avec justesse.' },
+    campus: { doorId: 'door-general-practice', position: [-3.7, 0, -2.2], footprint: [3.8, 4.2, 3.4], accent: '#8dc7ff', landmark: 'Pavillon de liaison', preview: 'Un futur parcours pour trier les informations et orienter avec justesse.' },
     manual: {
       purpose: 'Observer, orienter et coordonner les étapes d’un parcours de soin.',
       skills: ['Prioriser les informations', 'Repérer les signaux d’alerte', 'Orienter de façon sécurisée'],
@@ -38,7 +38,7 @@ export const ROLES = {
     description: 'Accompagner, surveiller et soutenir au plus près du quotidien.',
     theme: 'nursing',
     unlocked: true,
-    campus: { left: 45, top: 37, width: 16, height: 35, landmark: 'Atelier du soin', preview: 'Un parcours vivant autour de l’observation, des transmissions et de l’autonomie.' },
+    campus: { doorId: 'door-nursing', position: [0, 0, 1.1], footprint: [3.6, 3.6, 3.1], accent: '#c5a7ff', landmark: 'Atelier du soin', preview: 'Un parcours vivant autour de l’observation, des transmissions et de l’autonomie.' },
     manual: {
       purpose: 'Accompagner, surveiller et soutenir les personnes dans leur quotidien de soin.',
       skills: ['Observer une évolution', 'Transmettre une information utile', 'Soutenir l’autonomie'],
@@ -54,7 +54,7 @@ export const ROLES = {
     theme: 'psychology',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
-    campus: { left: 64, top: 27, width: 15, height: 38, landmark: 'Belvédère écoute', preview: 'Un futur espace de pratique pour créer une parole sûre et attentive.' },
+    campus: { doorId: 'door-psychology', position: [4, 0, -2], footprint: [3.6, 4.5, 3.2], accent: '#fa9bb5', landmark: 'Belvédère écoute', preview: 'Un futur espace de pratique pour créer une parole sûre et attentive.' },
     manual: {
       purpose: 'Créer un espace d’écoute sûr et comprendre les facteurs psychologiques.',
       skills: ['Écoute active', 'Reformulation', 'Repérage des besoins d’orientation'],
@@ -70,7 +70,7 @@ export const ROLES = {
     theme: 'pharmacy',
     unlocked: false,
     unlockRequirement: 'Bientôt disponible',
-    campus: { left: 80, top: 35, width: 15, height: 40, landmark: 'Tour des remèdes', preview: 'Un futur parcours pour rendre les traitements plus clairs et plus sûrs.' },
+    campus: { doorId: 'door-pharmacy', position: [7.3, 0, 1.2], footprint: [3.6, 5.1, 3], accent: '#77e9cb', landmark: 'Tour des remèdes', preview: 'Un futur parcours pour rendre les traitements plus clairs et plus sûrs.' },
     manual: {
       purpose: 'Informer et sécuriser le bon usage des traitements au plus près des personnes.',
       skills: ['Expliquer un traitement', 'Prévenir les risques', 'Orienter vers le bon interlocuteur'],

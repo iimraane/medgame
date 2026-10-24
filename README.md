@@ -41,4 +41,6 @@ En développement, l’API accepte uniquement les origines Vite `http://localhos
 
 ## Campus interactif
 
-Le campus est une expérience desktop : sous 1024 px, l’application affiche un avis indiquant que le jeu est disponible sur PC. La scène est construite en HTML/CSS à partir des métadonnées `campus` de chaque rôle : les bâtiments, leurs emplacements, leurs accents et leurs aperçus sont donc modifiables sans retoucher d’image. Le bouton **Jouer** affiche une courte transition, puis ouvre directement le hub.
+Le campus est une expérience desktop : sous 1024 px, l’application affiche un avis indiquant que le jeu est disponible sur PC. La scène locale Three.js est assemblée à partir des métadonnées `campus` de chaque rôle (`position`, `footprint`, `accent` et `doorId`) dans `src/data/roles.js`. Chaque porte est un mesh nommé, sélectionné par raycasting, et possède un contrôle HTML équivalent pour le clavier et les lecteurs d’écran. Si WebGL est indisponible, cette liste de destinations reste utilisable.
+
+Les interactions de la scène et de la liste passent par la même action : seuls les parcours déverrouillés ouvrent leurs niveaux ; les autres affichent leur aperçu. Aucun compte ni service distant n’est nécessaire : la progression reste dans le stockage navigateur existant. Le rendu, ses écouteurs et sa boucle d’animation sont libérés à chaque changement de vue. Le bouton **Jouer** affiche une courte transition, puis ouvre directement le hub.

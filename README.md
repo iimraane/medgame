@@ -14,17 +14,31 @@ Requires Node.js 18+ and `OPENAI_API_KEY` in `.env` for AI conversation. `OPENAI
 
 ```bash
 npm install
-npm run start
+npm run worker:dev
 ```
 
-Open `http://localhost:5173`. Run `npm run build` for a production bundle and `node --test tests/engine.test.js tests/storage.test.js tests/roles.test.js tests/campaign.test.js` for the focused test suite.
+Open the Wrangler URL shown in the terminal. Run `npm run build` and `npm test` before a deployment.
+
+## Cloudflare production deployment
+
+The Vite application and API are served together at `https://alimni.tv/`. Game progress remains only in browser storage; each active consultation is an expiring Durable Object session.
+
+Authenticate Wrangler, store the key outside source control, then deploy:
+
+```bash
+npx wrangler login
+npx wrangler secret put OPENAI_API_KEY
+npm run deploy
+```
+
+`wrangler.jsonc` binds `alimni.tv` and `www.alimni.tv` as custom domains. Never commit `.env`, `.dev.vars`, or a secret value.
 
 ## Clinique des parcours
 
 La page d’accueil présente une allée de clinique avec cinq portes de profession. La Diététique est le seul parcours ouvert et mène aux missions existantes. Les portes de médecine générale, soins infirmiers, psychologie et pharmacie indiquent clairement qu’elles arrivent bientôt et ne créent aucune session.
 
-En développement, l’API accepte uniquement les origines Vite `http://localhost:5173` et `http://127.0.0.1:5173`, en plus des origines de production existantes. Avec `NODE_ENV=production`, seules les deux origines HTTPS de production restent autorisées.
+En développement, l’API accepte uniquement les origines Vite `http://localhost:5173` et `http://127.0.0.1:5173`, en plus de `https://alimni.tv` et `https://www.alimni.tv`. En production, seules les deux origines HTTPS `alimni.tv` restent autorisées.
 
 ## Campus interactif
 
-Le campus est une expérience desktop : sous 1024 px, l’application affiche un avis indiquant que le jeu est disponible sur PC. `src/public/assets/campus-hub.png` est la scène de base, publiée par Vite sous `/game/assets/campus-hub.png`. Les cinq fichiers lossless `campus-panel-*.png` sont des images complètes au même format (1672×941), mais sont superposés et découpés localement au seul kiosque inférieur droit : ils ne doivent jamais être redimensionnés, recompressés ou remplacés par du contenu HTML. Le bouton **Jouer** précharge la scène, puis le hub précharge les états de kiosque.
+Le campus est une expérience desktop : sous 1024 px, l’application affiche un avis indiquant que le jeu est disponible sur PC. `src/public/assets/campus-hub.png` est la scène de base, publiée par Vite sous `/assets/campus-hub.png`. Les cinq fichiers lossless `campus-panel-*.png` sont des images complètes au même format (1672×941), mais sont superposés et découpés localement au seul kiosque inférieur droit : ils ne doivent jamais être redimensionnés, recompressés ou remplacés par du contenu HTML. Le bouton **Jouer** précharge la scène, puis le hub précharge les états de kiosque.

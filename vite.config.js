@@ -2,7 +2,9 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
     root: 'src',
-    base: '/game/',
+    // Production is served by the Worker at the custom-domain root.  Keep all
+    // asset URLs relative to that origin so no browser request leaves alimni.tv.
+    base: '/',
     build: {
         outDir: '../dist',
         // The output lives outside Vite's root. Empty it explicitly so a
@@ -12,7 +14,7 @@ export default defineConfig({
     server: {
         port: 5173,
         proxy: {
-            '/game/api': {
+            '/api': {
                 target: 'http://localhost:3001',
                 changeOrigin: true,
             },

@@ -123,7 +123,7 @@ test('local Vite origins are allowed only outside production', () => {
   assert.equal(isAllowedOrigin('http://localhost:5173', 'development'), true);
   assert.equal(isAllowedOrigin('http://127.0.0.1:5173', 'test'), true);
   assert.equal(isAllowedOrigin('http://localhost:5173', 'production'), false);
-  assert.deepEqual(getAllowedOrigins('production'), ['https://whatsapp.immo.harpytech.fr', 'https://medgame.harpytech.fr']);
+  assert.deepEqual(getAllowedOrigins('production'), ['https://alimni.tv', 'https://www.alimni.tv']);
   assert.equal(isAllowedOrigin('https://untrusted.example', 'development'), false);
 });
 

@@ -1,7 +1,7 @@
 // ─── AI Communication ────────────────────────────────────────────
 // Handles all API calls to the backend. Sessions are managed server-side.
 
-const API_BASE = '/game/api';
+const API_BASE = '/api';
 
 /**
  * Start a new game session on the server

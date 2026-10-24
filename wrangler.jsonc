@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "medgame",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-10-24",
+  "secrets": { "required": ["OPENAI_API_KEY"] },
+  "assets": { "directory": "./dist", "binding": "ASSETS" },
+  "routes": [
+    { "pattern": "alimni.tv", "custom_domain": true },
+    { "pattern": "www.alimni.tv", "custom_domain": true }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "SESSIONS", "class_name": "ConsultationSession" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ConsultationSession"] }]
+}

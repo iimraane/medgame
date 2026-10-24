@@ -1,4 +1,4 @@
-export const PRODUCTION_ORIGINS = ['https://whatsapp.immo.harpytech.fr', 'https://medgame.harpytech.fr'];
+export const PRODUCTION_ORIGINS = ['https://alimni.tv', 'https://www.alimni.tv'];
 export const LOCAL_VITE_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'];
 
 export function isLoopbackDevelopmentOrigin(origin) {

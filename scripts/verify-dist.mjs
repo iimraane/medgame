@@ -3,7 +3,9 @@ import { join } from 'node:path';
 
 const distDir = new URL('../dist/', import.meta.url);
 const indexHtml = await readFile(new URL('index.html', distDir), 'utf8');
-const assetPaths = [...indexHtml.matchAll(/\/game\/(assets\/[^"']+)/g)].map((match) => match[1]);
+// Root-hosted Worker assets deliberately use /assets rather than the retired
+// /game deployment prefix.
+const assetPaths = [...indexHtml.matchAll(/\/(?:game\/)?(assets\/[^"']+)/g)].map((match) => match[1]);
 
 if (!assetPaths.length) throw new Error('The production index does not reference any built assets.');
 

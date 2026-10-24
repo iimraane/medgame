@@ -1,13 +1,8 @@
-import fs from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
 import { NURSING_POOLS, NURSING_DISEASES } from '../src/data/nursingCampaign.js';
 import { NURSING_DOCUMENT_DEFINITIONS, materializeNursingDossier } from './nursingDossiers.js';
 
 export const MASTERY_THRESHOLD = 70;
 const AXES = ['foodHistory', 'context', 'communication', 'safePlan'];
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const ASSET_DIR = join(__dirname, '..', 'src', 'public', 'assets', 'dietetics');
 
 // Server-only whitelist: a browser can receive only these supplied static files.
 const ASSETS = Object.freeze({
@@ -16,6 +11,14 @@ const ASSETS = Object.freeze({
   'meal-c1-careful-lunch': 'meal-c1-careful-lunch.png', 'meal-c2-night-shift': 'meal-c2-night-shift.png', 'meal-c3-grazing-evening': 'meal-c3-grazing-evening.png', 'meal-c4-restaurant-choice': 'meal-c4-restaurant-choice.png', 'meal-c5-active-day': 'meal-c5-active-day.png',
   'meal-d1-student-kitchen': 'meal-d1-student-kitchen.jpg', 'meal-d2-quiet-breakfast': 'meal-d2-quiet-breakfast.jpg', 'meal-d3-busy-caregiver': 'meal-d3-busy-caregiver.jpg', 'meal-d4-limited-shopping': 'meal-d4-limited-shopping.jpg', 'meal-d5-uncertain-evening': 'meal-d5-uncertain-evening.jpg',
 });
+// This is intentionally a static manifest rather than a filesystem probe: the
+// same module is bundled into the Cloudflare Worker, where Node's fs is absent.
+const AVAILABLE_ASSET_IDS = new Set([
+  'meal-a1-rushed-breakfast', 'meal-a2-train-snack', 'meal-a3-desk-lunch', 'meal-a4-afternoon-pause', 'meal-a5-late-dinner',
+  'meal-b1-family-table', 'meal-b2-leftover-box', 'meal-b3-vegetarian-fast', 'meal-b4-social-takeaway', 'meal-b5-weekend-brunch',
+  'meal-c1-careful-lunch', 'meal-c2-night-shift', 'meal-c3-grazing-evening', 'meal-c4-restaurant-choice', 'meal-c5-active-day',
+  'meal-d1-student-kitchen', 'meal-d2-quiet-breakfast', 'meal-d3-busy-caregiver', 'meal-d4-limited-shopping', 'meal-d5-uncertain-evening',
+]);
 const ASSET_NOTES = Object.freeze({
   'meal-a1-rushed-breakfast': 'Le premier repas semble avoir été pris rapidement avant de partir.', 'meal-a2-train-snack': 'Une collation est consommée pendant un déplacement.', 'meal-a3-desk-lunch': 'Le déjeuner est pris près du poste de travail.', 'meal-a4-afternoon-pause': 'Une pause de l’après-midi associe boisson et petite collation.', 'meal-a5-late-dinner': 'Le repas du soir est préparé tard après une journée longue.',
   'meal-b1-family-table': 'Le repas du soir est partagé et organisé pour plusieurs personnes.', 'meal-b2-leftover-box': 'Un repas est préparé à partir de restes pour le lendemain.', 'meal-b3-vegetarian-fast': 'Un repas végétarien rapide est préparé avec peu de temps.', 'meal-b4-social-takeaway': 'Le repas est commandé et partagé dans un contexte social.', 'meal-b5-weekend-brunch': 'Le rythme du week-end diffère du rythme des jours travaillés.',
@@ -200,6 +203,6 @@ export function getEligibleTools(mission) { return mission ? TOOL_DEFINITIONS.fi
 export function chooseVariant(mission, recentVariantIds = [], random = Math.random) { if (!mission) return null; const recent = new Set(Array.isArray(recentVariantIds) ? recentVariantIds : []); const pool = mission.blueprints.filter((variant) => !recent.has(variant.id)); const eligible = pool.length ? pool : mission.blueprints; return eligible[Math.floor(random() * eligible.length)]; }
 export function chooseArchetype(_mission, random = Math.random) { return ['direct', 'reserved', 'reflective', 'tired'][Math.floor(random() * 4)]; }
 export function getPresentation(variant, archetype) { const openings = { direct: 'Je préfère vous expliquer franchement ce qui se passe.', reserved: 'Je ne sais pas très bien par où commencer.', reflective: 'J’ai essayé de comprendre par moi-même, mais je tourne un peu en rond.', tired: 'Je voudrais que cela devienne un peu moins compliqué au quotidien.' }; return { opening: `${variant.need} ${openings[archetype] || openings.reserved}`, baselineFacts: variant.contributors.slice(0, 2) }; }
-function visualItem(assetId) { const filename = ASSETS[assetId]; if (!filename || !fs.existsSync(join(ASSET_DIR, filename))) return { id: assetId, status: 'unavailable', label: 'Document indisponible' }; return { id: assetId, status: 'available', src: `/game/assets/dietetics/${filename}`, alt: 'Support visuel de consultation' }; }
+function visualItem(assetId) { const filename = ASSETS[assetId]; if (!filename || !AVAILABLE_ASSET_IDS.has(assetId)) return { id: assetId, status: 'unavailable', label: 'Document indisponible' }; return { id: assetId, status: 'available', src: `/assets/dietetics/${filename}`, alt: 'Support visuel de consultation' }; }
 export function useConsultationTool(variant, toolId, used = []) { const tool = TOOL_DEFINITIONS.find((item) => item.id === toolId); if (!variant || !tool || !variant.evidence[toolId]) return null; const payload = variant.evidence[toolId]; const promptNotes = toolId === 'gallery' ? payload.slice(0, 2).map((assetId) => ASSET_NOTES[assetId]).filter(Boolean) : toolId === 'rhythm-journal' ? payload.entries.map((entry) => `${entry.time} : ${entry.entry} — ${entry.context}`) : toolId === 'shopping-receipt' ? payload.items.map((item) => `${item.quantity} de ${item.item} (${item.brand})`) : toolId === 'pantry-fridge' ? [...payload.pantry, ...payload.fridge].map((item) => `${item.quantity} de ${item.item}`) : toolId === 'constraints-calendar' ? payload.days.flatMap((day) => day.slots.map((slot) => `${day.day} ${day.date} : ${slot}`)) : payload; return { id: tool.id, label: tool.label, kind: tool.kind, alreadyConsulted: used.includes(toolId), evidence: toolId === 'gallery' ? { images: payload.slice(0, 2).map(visualItem) } : toolId === 'rhythm-journal' || toolId === 'shopping-receipt' || toolId === 'pantry-fridge' || toolId === 'constraints-calendar' ? payload : { notes: payload }, promptNotes }; }
 export function evaluateServerMission(_missionId, variant) { if (!variant) throw new Error('Cas invalide'); const scores = Object.fromEntries(AXES.map((axis) => [axis, 0])); return { scores, total: 0, mastery: false, safetyAcknowledged: true, evidence: Object.fromEntries(AXES.map((axis) => [axis, { count: 0, message: 'Évaluation IA indisponible.' }])), improvement: 'L’évaluation IA est nécessaire pour valider la maîtrise de la mission.' }; }

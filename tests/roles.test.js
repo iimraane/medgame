@@ -66,7 +66,8 @@ test('the hub uses local Three.js doors with a semantic destination list', () =>
   assert.match(hub, /import \* as THREE from 'three'/);
   assert.match(hub, /new THREE\.WebGLRenderer/);
   assert.match(hub, /new THREE\.Raycaster/);
-  assert.match(hub, /class="campus-canvas"/);
+  assert.match(hub, /campus-scene--reference/);
+  assert.match(hub, /campus-reference-hotspot/);
   assert.match(hub, /class="campus-destination-list/);
   assert.match(hub, /campus-destination-list--sr-only/);
   assert.match(hub, /createSignTexture/);

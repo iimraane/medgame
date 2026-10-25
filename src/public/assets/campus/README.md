@@ -1,5 +1,7 @@
-# Campus material assets
+# Campus landscape assets and provenance
 
 `medical-concrete-glass-atlas.png` is a repository-owned procedural material atlas for the Three.js campus. It is loaded from the local `/assets/campus/` path only and contains no third-party or runtime-hosted content.
 
 The atlas is intentionally decorative: façade signs are generated in the scene as high-contrast canvas textures, so profession and availability labels remain readable if the atlas cannot load.
+
+The curated local Nature Kit subset — `tree_detailed.glb`, `tree_oak.glb`, `grass_large.glb`, `flower_yellowB.glb`, `flower_purpleB.glb`, `rock_largeA.glb`, and `rock_smallE.glb` — was created by Kenney and is distributed under Creative Commons Zero (CC0). It comes from [Kenney Nature Kit](https://kenney.nl/assets/nature-kit), archive/version **Nature Kit 2.1** (29 April 2020), using these source paths: `Models/GLB/tree_detailed.glb`, `Models/GLB/tree_oak.glb`, `Models/GLB/grass_large.glb`, `Models/GLB/flower_yellowB.glb`, `Models/GLB/flower_purpleB.glb`, `Models/GLB/rock_largeA.glb`, and `Models/GLB/rock_smallE.glb`. The source licence is committed verbatim as `KENNEY-NATURE-KIT-LICENSE.txt`. `campusHub.js` loads only these local files, clones a limited number of instances, and treats a load error as non-blocking: its procedural trees, shrubs, flowers, grass and rocks remain the complete fallback. No runtime or CDN asset URLs are used.

@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { getDoorAction, getRole, ROLES } from '../data/roles.js';
 import { navigate } from '../main.js';
 import { canInitializeCampus, createCampusLifecycle, resolveCampusSelection, shouldExitCampusOnEscape } from './campusHubState.js';
 import { addBox, animateArcadePortals, createCampusBuildings, setArcadePortalHighlight } from './campusBuildings.js';
+import { loadLocalLandscapeModels } from './campusLandscapeAssets.js';
 
 const MIN_LOADING_MS = 850;
 const campusLifecycle = createCampusLifecycle(
@@ -28,15 +30,40 @@ function disposeObject(object) {
   });
   textures.forEach((texture) => texture.dispose());
 }
-function addTree(scene, x, z, scale = 1) {
+const landscapeLoader = new GLTFLoader();
+const LOCAL_LANDSCAPE_ASSETS = Object.freeze({
+  trees: ['tree_detailed.glb', 'tree_oak.glb'], grass: 'grass_large.glb', flowers: ['flower_yellowB.glb', 'flower_purpleB.glb'], rocks: ['rock_largeA.glb', 'rock_smallE.glb'],
+});
+
+function shadow(mesh) { mesh.castShadow = true; mesh.receiveShadow = true; return mesh; }
+function addTree(scene, x, z, scale = 1, hue = 0) {
   const tree = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.1 * scale, .14 * scale, .85 * scale, 7), new THREE.MeshStandardMaterial({ color: 0x5c4636, roughness: .96 }));
-  trunk.position.y = .42 * scale; trunk.castShadow = true; tree.add(trunk);
-  const foliage = new THREE.Mesh(new THREE.ConeGeometry(.62 * scale, 1.7 * scale, 9), new THREE.MeshStandardMaterial({ color: 0x27684f, roughness: .88 }));
-  foliage.position.y = 1.42 * scale; foliage.castShadow = true; foliage.receiveShadow = true; tree.add(foliage);
-  const crown = new THREE.Mesh(new THREE.SphereGeometry(.5 * scale, 10, 8), new THREE.MeshStandardMaterial({ color: 0x3d855f, roughness: .9 }));
-  crown.position.y = 1.86 * scale; crown.castShadow = true; tree.add(crown);
+  const bark = new THREE.MeshStandardMaterial({ color: 0x624831, roughness: .98 }); const leaf = new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(.36 + hue, .38, .28), roughness: .93 });
+  const trunk = shadow(new THREE.Mesh(new THREE.CylinderGeometry(.11 * scale, .18 * scale, 1.18 * scale, 8), bark)); trunk.position.y = .59 * scale; tree.add(trunk);
+  [-.26, .24].forEach((offset, index) => { const branch = shadow(new THREE.Mesh(new THREE.CylinderGeometry(.035 * scale, .075 * scale, .62 * scale, 7), bark)); branch.position.set(offset * scale, 1.16 * scale, 0); branch.rotation.z = (index ? -.75 : .75); tree.add(branch); });
+  [[-.28, 1.72, .06], [.31, 1.77, -.05], [0, 2.06, .04], [.02, 1.48, .28]].forEach(([cx, cy, cz], index) => { const crown = shadow(new THREE.Mesh(new THREE.DodecahedronGeometry((.52 - index * .025) * scale, 1), leaf)); crown.position.set(cx * scale, cy * scale, cz * scale); crown.rotation.set(index, index * .7, .2); tree.add(crown); });
   tree.position.set(x, 0, z); scene.add(tree);
+}
+
+function addShrub(scene, x, z, scale = 1, color = 0x397550) { const group = new THREE.Group(); const material = new THREE.MeshStandardMaterial({ color, roughness: .94 }); [[0, .24, 0], [-.2, .2, .05], [.21, .18, -.05]].forEach(([px, py, pz], index) => { const bush = shadow(new THREE.Mesh(new THREE.IcosahedronGeometry((.28 - index * .025) * scale, 1), material)); bush.position.set(px * scale, py * scale, pz * scale); group.add(bush); }); group.position.set(x, 0, z); scene.add(group); }
+function addFlowerBed(scene, x, z, width = 1.45) { const group = new THREE.Group(); const soil = shadow(new THREE.Mesh(new THREE.CylinderGeometry(width / 2, width / 2 + .06, .09, 12), new THREE.MeshStandardMaterial({ color: 0x76533b, roughness: 1 }))); soil.position.y = .045; group.add(soil); for (let index = 0; index < 10; index += 1) { const angle = index * 2.4; const radius = .1 + (index % 4) * .09; const stem = shadow(new THREE.Mesh(new THREE.CylinderGeometry(.012, .018, .18 + (index % 2) * .05, 5), new THREE.MeshStandardMaterial({ color: 0x326a42, roughness: 1 }))); stem.position.set(Math.cos(angle) * radius * width, .14, Math.sin(angle) * radius * width); group.add(stem); const bloom = shadow(new THREE.Mesh(new THREE.OctahedronGeometry(.065 + (index % 2) * .012, 0), new THREE.MeshStandardMaterial({ color: index % 3 ? 0xffc869 : 0xf38cae, roughness: .7, emissive: index % 3 ? 0x311900 : 0x260611, emissiveIntensity: .16 }))); bloom.position.copy(stem.position); bloom.position.y += .16; group.add(bloom); } group.position.set(x, 0, z); scene.add(group); }
+function addBench(scene, x, z, direction = 1) { const bench = new THREE.Group(); const wood = new THREE.MeshStandardMaterial({ color: 0x8d5f39, roughness: .78 }); const metal = new THREE.MeshStandardMaterial({ color: 0x263d43, metalness: .65, roughness: .32 }); [-.22, 0, .22].forEach((y) => { const slat = shadow(new THREE.Mesh(new THREE.BoxGeometry(1.15, .075, .11), wood)); slat.position.set(0, .52 + y * .55, -.12 + y * .12); slat.rotation.x = -.16; bench.add(slat); }); [-.42, .42].forEach((sx) => { const leg = shadow(new THREE.Mesh(new THREE.CylinderGeometry(.04, .055, .5, 6), metal)); leg.position.set(sx, .25, 0); bench.add(leg); }); bench.position.set(x, 0, z); bench.rotation.y = direction * .25; scene.add(bench); }
+function addLamp(scene, x, z) { const lamp = new THREE.Group(); const metal = new THREE.MeshStandardMaterial({ color: 0x284a50, metalness: .74, roughness: .25 }); const pole = shadow(new THREE.Mesh(new THREE.CylinderGeometry(.035, .065, 1.35, 10), metal)); pole.position.y = .675; lamp.add(pole); const cap = shadow(new THREE.Mesh(new THREE.CylinderGeometry(.17, .11, .09, 10), metal)); cap.position.y = 1.38; lamp.add(cap); const lantern = shadow(new THREE.Mesh(new THREE.CylinderGeometry(.1, .13, .2, 8), new THREE.MeshStandardMaterial({ color: 0xffe5a1, emissive: 0xffbd54, emissiveIntensity: 1.1, roughness: .35 }))); lantern.position.y = 1.25; lamp.add(lantern); const glow = new THREE.PointLight(0xffd985, .48, 3.4); glow.position.y = 1.18; lamp.add(glow); lamp.position.set(x, 0, z); scene.add(lamp); }
+function addRock(scene, x, z, scale = 1) { const rock = shadow(new THREE.Mesh(new THREE.DodecahedronGeometry(.23 * scale, 0), new THREE.MeshStandardMaterial({ color: 0x788979, roughness: .98 }))); rock.scale.set(1.35, .65, .9); rock.position.set(x, .12 * scale, z); rock.rotation.set(.2, x, .1); scene.add(rock); }
+function addGrassTufts(scene) { const material = new THREE.MeshStandardMaterial({ color: 0x78ae5b, roughness: 1, side: THREE.DoubleSide }); for (let index = 0; index < 95; index += 1) { const x = ((index * 37) % 190) / 10 - 9.5; const z = ((index * 71) % 250) / 10 - 10.5; if (Math.abs(x) < 3 || Math.abs(z - 2) < .5) continue; const tuft = new THREE.Group(); for (let blade = 0; blade < 4; blade += 1) { const leaf = new THREE.Mesh(new THREE.PlaneGeometry(.075, .31 + ((index + blade) % 3) * .045), material); leaf.position.set((blade - 1.5) * .028, .16, (blade % 2 ? .025 : -.025)); leaf.rotation.set((blade - 1.5) * .18, index + blade * .8, (blade - 1.5) * .25); tuft.add(leaf); } tuft.position.set(x, 0, z); scene.add(tuft); } }
+
+const LANDSCAPE_PLACEMENTS = Object.freeze({
+    [LOCAL_LANDSCAPE_ASSETS.trees[0]]: [[-11.3, -5.7, .76], [-9.3, 4.7, .58], [10.7, -4.5, .76]],
+    [LOCAL_LANDSCAPE_ASSETS.trees[1]]: [[-6.4, -5.9, .68], [8.9, 4.6, .66]],
+    [LOCAL_LANDSCAPE_ASSETS.grass]: [[-5.2, 3.05, .23], [-4.7, 3.15, .2], [2.8, 3.1, .22], [3.75, 3.2, .19], [-7.1, -.6, .2], [7.2, -.7, .2]],
+    [LOCAL_LANDSCAPE_ASSETS.flowers[0]]: [[-4.5, 3.55, .19], [-3.8, 3.72, .18], [3.0, 3.55, .2], [3.6, 3.78, .18]],
+    [LOCAL_LANDSCAPE_ASSETS.flowers[1]]: [[-4.1, 3.8, .18], [-3.55, 3.48, .17], [3.35, 3.48, .19], [3.95, 3.68, .17]],
+    [LOCAL_LANDSCAPE_ASSETS.rocks[0]]: [[-8.15, 2.45, .33], [8.3, 2.8, .3]],
+    [LOCAL_LANDSCAPE_ASSETS.rocks[1]]: [[-9.75, -1.15, .22], [9.95, -1.75, .22], [-4.65, 5.45, .2], [5.35, 5.38, .2]],
+});
+
+function loadLandscapeKit(scene, isActive = () => true) {
+  return loadLocalLandscapeModels({ scene, loader: landscapeLoader, isActive, placements: LANDSCAPE_PLACEMENTS });
 }
 
 function createSkyTexture() {
@@ -75,11 +102,14 @@ function buildScene(canvas, roles, onDoor, onUnavailable) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(44, 32), new THREE.MeshStandardMaterial({ color: 0x4c925e, map: createSurfaceTexture('grass'), roughness: .98 })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
   const path = new THREE.Mesh(new THREE.PlaneGeometry(4.7, 30), new THREE.MeshStandardMaterial({ color: 0xd8c79f, map: createSurfaceTexture('path'), roughness: .9 })); path.rotation.x = -Math.PI / 2; path.position.y = .018; scene.add(path);
   [-2.46, 2.46].forEach((x) => { const curb = new THREE.Mesh(new THREE.BoxGeometry(.13, .07, 30), new THREE.MeshStandardMaterial({ color: 0xf6eedb, roughness: .68 })); curb.position.set(x, .06, 0); curb.castShadow = true; curb.receiveShadow = true; scene.add(curb); });
-  for (let index = 0; index < 7; index += 1) { const lamp = new THREE.Mesh(new THREE.CylinderGeometry(.035, .06, .78, 8), new THREE.MeshStandardMaterial({ color: 0x3a5a5f, metalness: .7, roughness: .28 })); lamp.position.set(index % 2 ? -2.85 : 2.85, .4, 5.6 - index * 1.95); lamp.castShadow = true; scene.add(lamp); const glow = new THREE.PointLight(0x8fffe5, .42, 3.2); glow.position.set(lamp.position.x, .82, lamp.position.z); scene.add(glow); }
-  [-1, 1].forEach((side) => { for (let index = 0; index < 3; index += 1) { const bench = new THREE.Group(); const wood = new THREE.MeshStandardMaterial({ color: 0x9b724f, map: atlas, roughness: .72 }); addBox(bench, [.9, .09, .28], [0, .45, 0], wood); [-.34, .34].forEach((x) => addBox(bench, [.08, .42, .08], [x, .22, 0], new THREE.MeshStandardMaterial({ color: 0x3f5153, metalness: .7, roughness: .3 }))); bench.position.set(side * 4.05, 0, 2.8 - index * 3.1); bench.rotation.y = side * .28; scene.add(bench); } });
+  for (let index = 0; index < 7; index += 1) addLamp(scene, index % 2 ? -2.85 : 2.85, 5.6 - index * 1.95);
+  [-1, 1].forEach((side) => { for (let index = 0; index < 3; index += 1) addBench(scene, side * 4.05, 2.8 - index * 3.1, side); });
   const campus = createCampusBuildings(roles, createSignTexture, atlas); campus.buildings.forEach((building) => scene.add(building)); const { doors } = campus;
-  [[-10, -5.9, 1], [-8.6, 4.1, .7], [-5.8, -5.5, .9], [-4.7, 4.6, .75], [5.8, -5.2, .85], [8.5, 4.3, .8], [10.2, -4.2, 1.1], [-10.5, .3, .64], [10.4, .1, .72]].forEach(([x, z, scale]) => addTree(scene, x, z, scale));
-  for (let index = 0; index < 16; index += 1) { const bed = new THREE.Mesh(new THREE.SphereGeometry(.16, 8, 6), new THREE.MeshStandardMaterial({ color: index % 2 ? 0xf0a5ba : 0xf3d36e, roughness: .72, emissive: index % 2 ? 0x35101c : 0x362400, emissiveIntensity: .18 })); bed.position.set(index < 8 ? -4.1 + (index % 4) * .55 : 2.5 + (index % 4) * .55, .12, index < 8 ? 3.4 + Math.floor(index / 4) * .34 : 3.6 + Math.floor(index / 4) * .34); bed.castShadow = true; scene.add(bed); }
+  [[-10, -5.9, 1], [-8.6, 4.1, .7], [-5.8, -5.5, .9], [-4.7, 4.6, .75], [5.8, -5.2, .85], [8.5, 4.3, .8], [10.2, -4.2, 1.1], [-10.5, .3, .64], [10.4, .1, .72]].forEach(([x, z, scale], index) => addTree(scene, x, z, scale, (index % 3) * .018));
+  [[-4.1, 3.55, 1.4], [3.25, 3.7, 1.35], [-6.2, -1.1, 1.1], [6.1, -.6, 1.1]].forEach(([x, z, width]) => addFlowerBed(scene, x, z, width));
+  [[-9.2, 1.9, .9, 0x346c4d], [-8.2, -2.4, .8, 0x4c7f42], [8.9, 2.2, .9, 0x3f7750], [9.4, -2.3, .75, 0x557e48], [-5.4, 5.3, .7, 0x3a6d4d], [5.4, 5.2, .7, 0x4d7b4b]].forEach(([x, z, scale, color]) => addShrub(scene, x, z, scale, color));
+  [[-7.9, 2.5, .9], [-9.7, -1.3, .7], [8.1, 2.9, .85], [10, -1.9, .7], [-4.6, 5.5, .65], [5.3, 5.4, .65]].forEach(([x, z, scale]) => addRock(scene, x, z, scale));
+  let landscapeDisposed = false; addGrassTufts(scene); loadLandscapeKit(scene, () => !landscapeDisposed);
   for (let index = 0; index < 7; index += 1) { const distant = new THREE.Mesh(new THREE.BoxGeometry(1.1 + (index % 2) * .4, 1.4 + (index % 3) * .5, .8), new THREE.MeshStandardMaterial({ color: index % 2 ? 0x547a88 : 0x6e8490, map: atlas, roughness: .76 })); distant.position.set(-10.5 + index * 3.5, .8 + (index % 3) * .18, -8.4); distant.castShadow = true; distant.receiveShadow = true; scene.add(distant); }
   const ridgeMaterial = new THREE.MeshStandardMaterial({ color: 0x5e8da0, roughness: .96 });
   [-11, -4, 4, 11].forEach((x, index) => { const ridge = new THREE.Mesh(new THREE.ConeGeometry(4.8 + (index % 2), 6 + index % 2, 4), ridgeMaterial); ridge.position.set(x, 2.5, -10); ridge.rotation.y = Math.PI / 4; ridge.receiveShadow = true; scene.add(ridge); });
@@ -91,7 +121,7 @@ function buildScene(canvas, roles, onDoor, onUnavailable) {
   const resize = () => { const { width, height } = canvas.getBoundingClientRect(); if (!width || !height) return; camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height, false); };
   const render = (time) => { const nextPixelRatio = Math.min(window.devicePixelRatio || 1, 2); if (nextPixelRatio !== pixelRatio) { pixelRatio = nextPixelRatio; renderer.setPixelRatio(pixelRatio); resize(); } if (!reducedMotion.matches) beacon.material.opacity = .2 + Math.sin(time / 750) * .12; animateArcadePortals(doors, time, reducedMotion.matches); renderer.render(scene, camera); frame = window.requestAnimationFrame(render); };
   let onContextLost;
-  const dispose = () => { window.cancelAnimationFrame(frame); canvas.removeEventListener('pointermove', onMove); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('click', onClick); canvas.removeEventListener('webglcontextlost', onContextLost); window.removeEventListener('resize', resize); disposeObject(scene); scene.background?.dispose?.(); renderer.dispose(); };
+  const dispose = () => { landscapeDisposed = true; window.cancelAnimationFrame(frame); canvas.removeEventListener('pointermove', onMove); canvas.removeEventListener('pointerleave', onLeave); canvas.removeEventListener('click', onClick); canvas.removeEventListener('webglcontextlost', onContextLost); window.removeEventListener('resize', resize); disposeObject(scene); scene.background?.dispose?.(); renderer.dispose(); };
   cleanup = dispose;
   onContextLost = (event) => { event.preventDefault(); dispose(); onUnavailable(); };
   canvas.addEventListener('pointermove', onMove); canvas.addEventListener('pointerleave', onLeave); canvas.addEventListener('click', onClick); canvas.addEventListener('webglcontextlost', onContextLost); window.addEventListener('resize', resize); resize(); frame = window.requestAnimationFrame(render);

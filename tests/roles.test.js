@@ -5,11 +5,13 @@ import http from 'node:http';
 import * as THREE from 'three';
 import { ROLES, getCampusHubSummary, getDoorAction, getRole } from '../src/data/roles.js';
 import { animateArcadePortals, createCampusBuildings, setArcadePortalHighlight } from '../src/ui/campusBuildings.js';
+import { loadLocalLandscapeModels } from '../src/ui/campusLandscapeAssets.js';
 import { isCampusDesktop } from '../src/ui/campusPanelState.js';
 import { canInitializeCampus, createCampusLifecycle, resolveCampusSelection, shouldExitCampusOnEscape } from '../src/ui/campusHubState.js';
 import { createOriginGuard, getAllowedOrigins, isAllowedOrigin } from '../server/origins.js';
 
 const hub = fs.readFileSync(new URL('../src/ui/campusHub.js', import.meta.url), 'utf8');
+const landscapeAssets = fs.readFileSync(new URL('../src/ui/campusLandscapeAssets.js', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
 
 test('the campus config exposes five uniform opaque house destinations', () => {
@@ -35,7 +37,7 @@ test('the campus config exposes five uniform opaque house destinations', () => {
 test('constructed campus houses stay opaque and attach arcade portals only to playable doors', () => {
   const { doors, buildings } = createCampusBuildings(Object.values(ROLES), () => new THREE.Texture());
   assert.equal(buildings.length, 5); assert.equal(doors.length, 5);
-  for (const building of buildings) for (const name of ['campus-house-wall', 'campus-house-roof', 'campus-house-window', 'campus-profession-sign']) assert.equal(building.getObjectByName(name).material.transparent, false);
+  for (const building of buildings) { for (const name of ['campus-house-wall', 'campus-house-roof', 'campus-house-window', 'campus-profession-sign']) assert.equal(building.getObjectByName(name).material.transparent, false); assert.equal(building.getObjectsByProperty('name', 'campus-house-window-muntin').length, 12); }
   const portalDoors = doors.filter((door) => door.userData.portal); assert.deepEqual(portalDoors.map((door) => door.userData.roleId), ['dietetics', 'nursing']);
   assert.equal(portalDoors.every((door) => !doors.includes(door.userData.portal.portal)), true);
   const portal = portalDoors[0].userData.portal; setArcadePortalHighlight(portalDoors[0], true); assert.equal(portal.light.intensity, 3.5); assert.equal(portal.portal.scale.x, 1.09);
@@ -54,8 +56,40 @@ test('the hub uses local Three.js doors with a semantic destination list', () =>
   assert.match(hub, /shouldExitCampusOnEscape/);
   assert.doesNotMatch(hub, /campus-hub\.png|campus-panel-|campus-kiosk|campus-directory|new Image\(/);
   assert.match(hub, /createCampusBuildings/);
+  assert.match(hub, /GLTFLoader/);
+  for (const filename of ['tree_detailed.glb', 'tree_oak.glb', 'grass_large.glb', 'flower_yellowB.glb', 'flower_purpleB.glb', 'rock_largeA.glb', 'rock_smallE.glb']) assert.match(hub, new RegExp(filename.replace('.', '\\.')));
+  assert.match(hub, /addFlowerBed|addShrub|addBench|addLamp|addRock/);
+  assert.match(hub, /intersectObjects\(doors, false\)/);
   assert.doesNotMatch(hub, /silhouette ===/);
   assert.match(css, /\.campus-canvas/);
+});
+
+test('campus landscape assets are local, licensed, and have a procedural fallback', () => {
+  const assetRoot = new URL('../src/public/assets/campus/', import.meta.url);
+  const manifest = fs.readFileSync(new URL('README.md', assetRoot), 'utf8');
+  const assetNames = ['tree_detailed.glb', 'tree_oak.glb', 'grass_large.glb', 'flower_yellowB.glb', 'flower_purpleB.glb', 'rock_largeA.glb', 'rock_smallE.glb'];
+  assert.match(manifest, /provenance|licence manifest/i);
+  assert.match(manifest, /Kenney/);
+  assert.match(manifest, /Creative Commons Zero \(CC0\)/);
+  assert.match(fs.readFileSync(new URL('KENNEY-NATURE-KIT-LICENSE.txt', assetRoot), 'utf8'), /License: \(Creative Commons Zero, CC0\)/);
+  for (const filename of assetNames) assert.ok(fs.statSync(new URL(filename, assetRoot)).size > 1024, `${filename} is a committed local model`);
+  assert.match(hub, /loadLandscapeKit\(scene,/);
+  assert.match(landscapeAssets, /gltf\.scene\.clone\(true\)/);
+  assert.match(landscapeAssets, /disposeDecodedLandscape/);
+  assert.match(hub, /addGrassTufts\(scene\)/);
+});
+
+test('local landscape loader clones loaded assets, records failures, and disposes late decoded scenes', () => {
+  const calls = []; const loader = { load(url, loaded, progress, failed) { calls.push({ url, loaded, failed }); } }; const target = new THREE.Group();
+  const result = loadLocalLandscapeModels({ scene: target, loader, placements: { 'tree.glb': [[1, 2, .5], [3, 4, .25]] } });
+  const decoded = new THREE.Group(); const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial()); decoded.add(mesh);
+  calls[0].loaded({ scene: decoded });
+  assert.equal(target.children.length, 2); assert.equal(target.children[0].position.x, 1); assert.equal(mesh.castShadow, true); assert.equal(mesh.receiveShadow, true);
+  calls[0].failed(); assert.deepEqual(result.failedFiles, ['tree.glb']);
+  let geometryDisposed = false; let materialDisposed = false; const inactive = new THREE.Group(); const lateMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial()); lateMesh.geometry.dispose = () => { geometryDisposed = true; }; lateMesh.material.dispose = () => { materialDisposed = true; }; inactive.add(lateMesh);
+  const later = []; loadLocalLandscapeModels({ scene: target, loader: { load(...args) { later.push(args); } }, isActive: () => false, placements: { 'late.glb': [[0, 0, 1]] } });
+  later[0][1]({ scene: inactive });
+  assert.equal(target.children.length, 2); assert.equal(geometryDisposed, true); assert.equal(materialDisposed, true);
 });
 
 test('playable destination data remains available without visible scene chrome', () => {

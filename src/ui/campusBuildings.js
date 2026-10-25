@@ -11,6 +11,11 @@ function addCampusSign(building, role, width, height, depth, signTextureFactory)
   sign.name = 'campus-profession-sign'; sign.position.set(0, Math.min(height - .55, 2.85), depth / 2 + .17); building.add(sign); return sign;
 }
 
+function addWindowMuntins(building, x, y, width, depth, material) {
+  [-.11, .11].forEach((offset) => { const muntin = addBox(building, [.025, .58, .075], [x + offset * width * .18, y, depth / 2 + .075], material); muntin.name = 'campus-house-window-muntin'; });
+  const crossbar = addBox(building, [width * .21, .025, .075], [x, y, depth / 2 + .075], material); crossbar.name = 'campus-house-window-muntin';
+}
+
 function addArcadePortal(building, accentColor, depth) {
   const portal = new THREE.Group(); portal.name = 'playable-door-portal';
   const glowMaterial = new THREE.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 1.45, roughness: .18, metalness: .55 });
@@ -35,11 +40,14 @@ export function createCampusBuildings(roles, signTextureFactory, atlas = null) {
     const concrete = new THREE.MeshStandardMaterial({ color: 0xd7d2c4, roughness: .77, metalness: .12, bumpMap: atlas, bumpScale: .075 });
     const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x26363a, map: atlas, roughness: .72, metalness: .16 });
     const windowMaterial = new THREE.MeshStandardMaterial({ color: 0xffe6a1, emissive: 0x8f5d24, emissiveIntensity: .42, roughness: .42, metalness: .08 });
-    const porchMaterial = new THREE.MeshStandardMaterial({ color: 0x806a55, map: atlas, roughness: .82, metalness: .06 });
-    const wall = addBox(building, [width, height, depth], [0, height / 2, 0], concrete); wall.name = 'campus-house-wall'; const roof = addGableRoof(building, width + .22, depth + .18, .82, [0, height, 0], roofMaterial); roof.name = 'campus-house-roof'; addBox(building, [width * .54, .16, .72], [0, .08, depth / 2 + .34], porchMaterial);
-    [-.27, .27].forEach((x) => { const window = addBox(building, [width * .18, .48, .06], [x * width, 1.47, depth / 2 + .04], windowMaterial); window.name = 'campus-house-window'; }); for (let column = -1; column <= 1; column += 2) { const window = addBox(building, [width * .18, .48, .06], [column * width * .29, 2.45, depth / 2 + .04], windowMaterial); window.name = 'campus-house-window'; }
+    const porchMaterial = new THREE.MeshStandardMaterial({ color: 0x806a55, map: atlas, roughness: .82, metalness: .06 }); const trimMaterial = new THREE.MeshStandardMaterial({ color: 0xf1ead9, roughness: .64 }); const roofDetailMaterial = new THREE.MeshStandardMaterial({ color: 0x1c2a2f, roughness: .68, metalness: .18 });
+    const wall = addBox(building, [width, height, depth], [0, height / 2, 0], concrete); wall.name = 'campus-house-wall'; const roof = addGableRoof(building, width + .22, depth + .18, .82, [0, height, 0], roofMaterial); roof.name = 'campus-house-roof';
+    const roofSlope = Math.atan2(.82, width / 2); [-1, 1].forEach((side) => { const batten = addBox(building, [width * .49, .035, depth + .23], [side * width * .245, height + .41, 0], roofDetailMaterial); batten.rotation.z = -side * roofSlope; });
+    addBox(building, [width * .58, .16, .76], [0, .08, depth / 2 + .36], porchMaterial); addBox(building, [width * .47, .12, .55], [0, .22, depth / 2 + .5], trimMaterial);
+    [-1, 1].forEach((side) => { addBox(building, [.1, 1.05, .1], [side * width * .25, .62, depth / 2 + .58], trimMaterial); addBox(building, [.13, height * .9, .08], [side * (width / 2 + .02), height * .49, depth / 2 + .045], trimMaterial); });
+    [-.27, .27].forEach((x) => { const window = addBox(building, [width * .18, .48, .06], [x * width, 1.47, depth / 2 + .04], windowMaterial); window.name = 'campus-house-window'; addWindowMuntins(building, x * width, 1.47, width, depth, trimMaterial); }); for (let column = -1; column <= 1; column += 2) { const window = addBox(building, [width * .18, .48, .06], [column * width * .29, 2.45, depth / 2 + .04], windowMaterial); window.name = 'campus-house-window'; addWindowMuntins(building, column * width * .29, 2.45, width, depth, trimMaterial); }
     const doorMaterial = new THREE.MeshStandardMaterial({ color: role.unlocked ? accentColor : 0x33464b, emissive: role.unlocked ? accentColor : 0x000000, emissiveIntensity: role.unlocked ? .75 : 0, roughness: .35, metalness: .32 });
-    const door = addBox(building, [Math.min(width * .31, 1.25), 1.75, .13], [0, .88, depth / 2 + .12], doorMaterial); const portal = role.unlocked ? addArcadePortal(building, accentColor, depth) : null;
+    addBox(building, [Math.min(width * .37, 1.42), 1.98, .1], [0, .99, depth / 2 + .075], trimMaterial); const door = addBox(building, [Math.min(width * .31, 1.25), 1.75, .13], [0, .88, depth / 2 + .14], doorMaterial); addBox(building, [Math.min(width * .27, 1.08), .05, .16], [0, 1.38, depth / 2 + .22], trimMaterial); const portal = role.unlocked ? addArcadePortal(building, accentColor, depth) : null;
     const sign = addCampusSign(building, role, width, height, depth, signTextureFactory); door.name = doorId; door.userData = { roleId: role.id, doorMaterial, sign, portal, baseEmissive: doorMaterial.emissiveIntensity }; doors.push(door); buildings.push(building); scene.add(building);
   });
   return { scene, doors, buildings };

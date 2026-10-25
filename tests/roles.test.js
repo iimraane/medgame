@@ -6,12 +6,13 @@ import * as THREE from 'three';
 import { ROLES, getCampusHubSummary, getDoorAction, getRole } from '../src/data/roles.js';
 import { animateArcadePortals, createCampusBuildings, setArcadePortalHighlight } from '../src/ui/campusBuildings.js';
 import { loadLocalLandscapeModels } from '../src/ui/campusLandscapeAssets.js';
-import { CAMPUS_COMPOSITION, createPaverApproach } from '../src/ui/campusGardenComposition.js';
+import { attachMedicalGardenComposition, CAMPUS_COMPOSITION, createPaverApproach, LANDSCAPE_PLACEMENTS } from '../src/ui/campusGardenComposition.js';
 import { isCampusDesktop } from '../src/ui/campusPanelState.js';
 import { canInitializeCampus, createCampusLifecycle, resolveCampusSelection, shouldExitCampusOnEscape } from '../src/ui/campusHubState.js';
 import { createOriginGuard, getAllowedOrigins, isAllowedOrigin } from '../server/origins.js';
 
 const hub = fs.readFileSync(new URL('../src/ui/campusHub.js', import.meta.url), 'utf8');
+const gardenComposition = fs.readFileSync(new URL('../src/ui/campusGardenComposition.js', import.meta.url), 'utf8');
 const landscapeAssets = fs.readFileSync(new URL('../src/ui/campusLandscapeAssets.js', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
 
@@ -44,6 +45,7 @@ test('constructed campus houses stay opaque and attach arcade portals only to pl
     assert.equal(building.getObjectsByProperty('name', 'campus-stone-pier').length, 2);
     assert.equal(building.getObjectsByProperty('name', 'campus-roof-tile').length, 14);
     assert.equal(building.getObjectsByProperty('name', 'campus-entry-sconce').length, 2);
+    assert.equal(building.getObjectsByProperty('name', 'campus-entry-sconce-light').length, 2);
     assert.ok(building.getObjectByName('campus-timber-soffit'));
     assert.ok(building.getObjectByName('campus-glazed-entry-frame'));
     const tiles = building.getObjectsByProperty('name', 'campus-roof-tile'); const roofWidth = 3.8 + .22; const slope = Math.atan2(.82, roofWidth / 2);
@@ -53,6 +55,8 @@ test('constructed campus houses stay opaque and attach arcade portals only to pl
     assert.ok(Math.abs(tiles[7].position.y - (4.2 + .82 - Math.abs(tiles[7].position.x) * (.82 / (roofWidth / 2)))) < 1e-9);
   }
   const portalDoors = doors.filter((door) => door.userData.portal); assert.deepEqual(portalDoors.map((door) => door.userData.roleId), ['dietetics', 'nursing']);
+  assert.equal(portalDoors.every((door) => door.material.transparent && door.material.emissiveIntensity > 0), true);
+  assert.equal(doors.filter((door) => !door.userData.portal).every((door) => door.material.transparent && door.material.emissiveIntensity === 0), true);
   assert.equal(portalDoors.every((door) => !doors.includes(door.userData.portal.portal)), true);
   const portal = portalDoors[0].userData.portal; setArcadePortalHighlight(portalDoors[0], true); assert.equal(portal.light.intensity, 3.5); assert.equal(portal.portal.scale.x, 1.09);
   animateArcadePortals(portalDoors, 520, true); assert.equal(portal.chevrons.position.y, 0); assert.equal(portal.portal.rotation.y, 0);
@@ -71,9 +75,9 @@ test('the hub uses local Three.js doors with a semantic destination list', () =>
   assert.doesNotMatch(hub, /campus-hub\.png|campus-panel-|campus-kiosk|campus-directory|new Image\(/);
   assert.match(hub, /createCampusBuildings/);
   assert.match(hub, /GLTFLoader/);
-  for (const filename of ['tree_detailed.glb', 'tree_oak.glb', 'grass_large.glb', 'flower_yellowB.glb', 'flower_purpleB.glb', 'rock_largeA.glb', 'rock_smallE.glb']) assert.match(hub, new RegExp(filename.replace('.', '\\.')));
+  for (const filename of ['tree_detailed.glb', 'tree_oak.glb', 'grass_large.glb', 'flower_yellowB.glb', 'flower_purpleB.glb', 'rock_largeA.glb', 'rock_smallE.glb']) assert.match(gardenComposition, new RegExp(filename.replace('.', '\\.')));
   assert.match(hub, /addFlowerBed|addShrub|addBench|addLamp|addRock/);
-  assert.match(hub, /createPaverApproach|campus-paver-approach|campus-path-curb/);
+  assert.match(hub, /attachMedicalGardenComposition/);
   assert.match(hub, /addMountainRange|campus-mountain-layer|addCloud/);
   assert.match(hub, /CAMPUS_COMPOSITION/);
   assert.match(hub, /intersectObjects\(doors, false\)/);
@@ -92,8 +96,14 @@ test('the medical garden composition has an executable continuous approach and c
   assert.equal(pavers.castShadow, false);
   const first = new THREE.Matrix4(); const last = new THREE.Matrix4(); const firstPosition = new THREE.Vector3(); const lastPosition = new THREE.Vector3();
   pavers.getMatrixAt(0, first); pavers.getMatrixAt(pavers.count - 1, last); firstPosition.setFromMatrixPosition(first); lastPosition.setFromMatrixPosition(last);
-  assert.ok(firstPosition.z - lastPosition.z > 20);
+  assert.ok(firstPosition.z - lastPosition.z > 29.39);
   assert.ok(CAMPUS_COMPOSITION.pavers.depth >= CAMPUS_COMPOSITION.pavers.pitch);
+  const scene = new THREE.Scene(); const mountains = []; const clouds = []; let placements;
+  attachMedicalGardenComposition(scene, { createMountainLayer: (target, ...args) => { mountains.push(args); target.add(new THREE.Group()); }, createCloudLayer: (target, ...args) => { clouds.push(args); target.add(new THREE.Group()); }, loadLandscape: (value) => { placements = value; } });
+  assert.ok(scene.getObjectByName('campus-paver-approach'));
+  assert.equal(scene.getObjectsByProperty('name', 'campus-path-curb').length, 2);
+  assert.equal(mountains.length, 3); assert.equal(clouds.length, 4); assert.equal(placements, LANDSCAPE_PLACEMENTS);
+  for (const [filename, positions] of Object.entries(LANDSCAPE_PLACEMENTS)) { assert.ok(filename.endsWith('.glb')); assert.ok(positions.length >= 4); positions.forEach(([x, z, scale]) => { assert.ok(Math.abs(x) <= 12 && Math.abs(z) <= 6 && scale > 0 && scale <= 1); }); }
 });
 
 test('campus landscape assets are local, licensed, and have a procedural fallback', () => {

@@ -5,7 +5,7 @@ import { navigate } from '../main.js';
 import { canInitializeCampus, createCampusLifecycle, resolveCampusSelection, shouldExitCampusOnEscape } from './campusHubState.js';
 import { addBox, animateArcadePortals, createCampusBuildings, setArcadePortalHighlight } from './campusBuildings.js';
 import { loadLocalLandscapeModels } from './campusLandscapeAssets.js';
-import { CAMPUS_COMPOSITION, createPaverApproach } from './campusGardenComposition.js';
+import { CAMPUS_COMPOSITION, attachMedicalGardenComposition, LANDSCAPE_PLACEMENTS } from './campusGardenComposition.js';
 
 const MIN_LOADING_MS = 850;
 const campusLifecycle = createCampusLifecycle(
@@ -32,9 +32,6 @@ function disposeObject(object) {
   textures.forEach((texture) => texture.dispose());
 }
 const landscapeLoader = new GLTFLoader();
-const LOCAL_LANDSCAPE_ASSETS = Object.freeze({
-  trees: ['tree_detailed.glb', 'tree_oak.glb'], grass: 'grass_large.glb', flowers: ['flower_yellowB.glb', 'flower_purpleB.glb'], rocks: ['rock_largeA.glb', 'rock_smallE.glb'],
-});
 
 function shadow(mesh) { mesh.castShadow = true; mesh.receiveShadow = true; return mesh; }
 function addTree(scene, x, z, scale = 1, hue = 0) {
@@ -66,18 +63,8 @@ function addCloud(scene, x, y, z, scale = 1) {
   cloud.name = 'campus-procedural-cloud'; cloud.position.set(x, y, z); scene.add(cloud);
 }
 
-const LANDSCAPE_PLACEMENTS = Object.freeze({
-    [LOCAL_LANDSCAPE_ASSETS.trees[0]]: [[-11.3, -5.7, .76], [-9.3, 4.7, .58], [10.7, -4.5, .76], [-10.9, 3, .54], [10.9, 3.1, .54]],
-    [LOCAL_LANDSCAPE_ASSETS.trees[1]]: [[-6.4, -5.9, .68], [8.9, 4.6, .66], [-8.2, 4.9, .5], [7.9, -5.2, .5]],
-    [LOCAL_LANDSCAPE_ASSETS.grass]: [[-5.2, 3.05, .23], [-4.7, 3.15, .2], [2.8, 3.1, .22], [3.75, 3.2, .19], [-7.1, -.6, .2], [7.2, -.7, .2], [-6.8, 2.8, .18], [-5.9, 3.5, .2], [-4.8, -3.6, .18], [-3.7, -4.5, .2], [3.6, -4.3, .2], [4.7, -3.5, .18], [5.8, 3.4, .2], [6.8, 2.8, .18]],
-    [LOCAL_LANDSCAPE_ASSETS.flowers[0]]: [[-4.5, 3.55, .19], [-3.8, 3.72, .18], [3.0, 3.55, .2], [3.6, 3.78, .18], [-6.5, 2.4, .17], [-5.8, 2.85, .17], [5.5, 2.8, .18], [6.4, 2.35, .17]],
-    [LOCAL_LANDSCAPE_ASSETS.flowers[1]]: [[-4.1, 3.8, .18], [-3.55, 3.48, .17], [3.35, 3.48, .19], [3.95, 3.68, .17], [-4.5, -3.6, .17], [-3.75, -4.2, .16], [3.7, -4.1, .17], [4.5, -3.55, .16]],
-    [LOCAL_LANDSCAPE_ASSETS.rocks[0]]: [[-8.15, 2.45, .33], [8.3, 2.8, .3], [-7.3, 3.4, .25], [7.3, 3.4, .25]],
-    [LOCAL_LANDSCAPE_ASSETS.rocks[1]]: [[-9.75, -1.15, .22], [9.95, -1.75, .22], [-4.65, 5.45, .2], [5.35, 5.38, .2], [-5.5, -4.9, .18], [5.5, -4.9, .18]],
-});
-
-function loadLandscapeKit(scene, isActive = () => true) {
-  return loadLocalLandscapeModels({ scene, loader: landscapeLoader, isActive, placements: LANDSCAPE_PLACEMENTS });
+function loadLandscapeKit(scene, isActive = () => true, placements = LANDSCAPE_PLACEMENTS) {
+  return loadLocalLandscapeModels({ scene, loader: landscapeLoader, isActive, placements });
 }
 
 function createSkyTexture() {
@@ -115,8 +102,7 @@ function buildScene(canvas, roles, onDoor, onUnavailable) {
   scene.add(new THREE.HemisphereLight(0xd9f7ff, 0x28543f, 2.35)); const sun = new THREE.DirectionalLight(0xfff0ce, 3.6); sun.position.set(-12, 16, 8); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.normalBias = .025; sun.shadow.camera.left = -15; sun.shadow.camera.right = 15; sun.shadow.camera.top = 13; sun.shadow.camera.bottom = -10; scene.add(sun);
   const atlas = new THREE.TextureLoader().load('/assets/campus/medical-concrete-glass-atlas.png'); atlas.colorSpace = THREE.SRGBColorSpace; atlas.wrapS = atlas.wrapT = THREE.RepeatWrapping; atlas.repeat.set(2, 2);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(44, 32), new THREE.MeshStandardMaterial({ color: 0x4c925e, map: createSurfaceTexture('grass'), roughness: .98 })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
-  const path = new THREE.Mesh(new THREE.PlaneGeometry(4.9, 30), new THREE.MeshStandardMaterial({ color: 0xd8c79f, map: createSurfaceTexture('path'), roughness: .9 })); path.name = 'campus-paver-bed'; path.rotation.x = -Math.PI / 2; path.position.y = .018; scene.add(path); scene.add(createPaverApproach());
-  [-2.52, 2.52].forEach((x) => { const curb = new THREE.Mesh(new THREE.BoxGeometry(.16, .11, 30), new THREE.MeshStandardMaterial({ color: 0xf6eedb, roughness: .68 })); curb.name = 'campus-path-curb'; curb.position.set(x, .07, 0); curb.castShadow = true; curb.receiveShadow = true; scene.add(curb); });
+  const path = new THREE.Mesh(new THREE.PlaneGeometry(4.9, 30), new THREE.MeshStandardMaterial({ color: 0xd8c79f, map: createSurfaceTexture('path'), roughness: .9 })); path.name = 'campus-paver-bed'; path.rotation.x = -Math.PI / 2; path.position.y = .018; scene.add(path);
   for (let index = 0; index < 8; index += 1) addLamp(scene, index % 2 ? -2.95 : 2.95, 6.1 - index * 1.78);
   [-1, 1].forEach((side) => { for (let index = 0; index < 3; index += 1) addBench(scene, side * 4.25, 2.75 - index * 3.1, side); });
   const campus = createCampusBuildings(roles, createSignTexture, atlas); campus.buildings.forEach((building) => scene.add(building)); const { doors } = campus;
@@ -124,9 +110,7 @@ function buildScene(canvas, roles, onDoor, onUnavailable) {
   [[-4.1, 3.55, 1.4], [3.25, 3.7, 1.35], [-6.2, -1.1, 1.1], [6.1, -.6, 1.1], [-3.75, -4.2, 1], [3.8, -4.05, 1], [-7.7, 2.9, .9], [7.7, 2.9, .9]].forEach(([x, z, width]) => addFlowerBed(scene, x, z, width));
   [[-9.2, 1.9, .9, 0x346c4d], [-8.2, -2.4, .8, 0x4c7f42], [8.9, 2.2, .9, 0x3f7750], [9.4, -2.3, .75, 0x557e48], [-5.4, 5.3, .7, 0x3a6d4d], [5.4, 5.2, .7, 0x4d7b4b], [-6.9, 3.5, .7, 0x487a4a], [6.9, 3.5, .7, 0x487a4a], [-4.1, -4.8, .75, 0x4b7f4d], [4.1, -4.8, .75, 0x4b7f4d]].forEach(([x, z, scale, color]) => addShrub(scene, x, z, scale, color));
   [[-7.9, 2.5, .9], [-9.7, -1.3, .7], [8.1, 2.9, .85], [10, -1.9, .7], [-4.6, 5.5, .65], [5.3, 5.4, .65]].forEach(([x, z, scale]) => addRock(scene, x, z, scale));
-  let landscapeDisposed = false; addGrassTufts(scene); loadLandscapeKit(scene, () => !landscapeDisposed);
-  horizon.mountains.forEach(([z, color, scale]) => addMountainRange(scene, z, color, scale));
-  horizon.clouds.forEach(([x, y, z, scale]) => addCloud(scene, x, y, z, scale));
+  let landscapeDisposed = false; addGrassTufts(scene); attachMedicalGardenComposition(scene, { createMountainLayer: addMountainRange, createCloudLayer: addCloud, loadLandscape: (placements) => loadLandscapeKit(scene, () => !landscapeDisposed, placements) });
   const beacon = new THREE.Mesh(new THREE.CylinderGeometry(.045, .09, 6.8, 12), new THREE.MeshBasicMaterial({ color: 0x9effec, transparent: true, opacity: .28 })); beacon.name = 'campus-portal-beacon'; beacon.position.set(0, 3.4, -4.8); scene.add(beacon);
   const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2(); let hovered = null; let frame = 0;
   const setHighlight = (door) => { if (hovered === door) return; if (hovered) { hovered.userData.doorMaterial.emissiveIntensity = hovered.userData.baseEmissive; setArcadePortalHighlight(hovered, false); } hovered = door; if (hovered) { hovered.userData.doorMaterial.emissiveIntensity = hovered.userData.baseEmissive + 1.4; setArcadePortalHighlight(hovered, true); } };

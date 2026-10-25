@@ -60,7 +60,7 @@ export function createCampusBuildings(roles, signTextureFactory, atlas = null) {
     const wall = addBox(building, [width, height, depth], [0, height / 2, 0], concrete); wall.name = 'campus-house-wall';
     const roof = addGableRoof(building, width + .22, depth + .18, .82, [0, height, 0], roofMaterial); roof.name = 'campus-house-roof';
     addRoofTiles(building, width + .22, depth + .18, height, .82, roofTileMaterial);
-    const roofSlope = Math.atan2(.82, width / 2); [-1, 1].forEach((side) => { const batten = addBox(building, [width * .49, .045, depth + .23], [side * width * .245, height + .41, 0], roofDetailMaterial); batten.rotation.z = -side * roofSlope; });
+    const roofWidth = width + .22; const roofSlope = Math.atan2(.82, roofWidth / 2); [-1, 1].forEach((side) => { const batten = addBox(building, [roofWidth * .49, .045, depth + .23], [side * roofWidth * .245, height + .41, 0], roofDetailMaterial); batten.rotation.z = -side * roofSlope; });
     const soffit = addBox(building, [width + .24, .17, depth + .24], [0, height - .08, 0], timber); soffit.name = 'campus-timber-soffit';
     addBox(building, [width * .66, .13, .84], [0, .07, depth / 2 + .42], timber).name = 'campus-entry-step';
     addBox(building, [width * .54, .12, .62], [0, .19, depth / 2 + .56], trimMaterial).name = 'campus-entry-step';
@@ -70,12 +70,12 @@ export function createCampusBuildings(roles, signTextureFactory, atlas = null) {
       addBox(building, [.13, height * .9, .08], [side * (width / 2 + .02), height * .49, depth / 2 + .045], trimMaterial);
     });
     [-.27, .27].forEach((x) => { const window = addBox(building, [width * .18, .48, .06], [x * width, 1.47, depth / 2 + .04], windowMaterial); window.name = 'campus-house-window'; addWindowMuntins(building, x * width, 1.47, width, depth, trimMaterial); }); for (let column = -1; column <= 1; column += 2) { const window = addBox(building, [width * .18, .48, .06], [column * width * .29, 2.45, depth / 2 + .04], windowMaterial); window.name = 'campus-house-window'; addWindowMuntins(building, column * width * .29, 2.45, width, depth, trimMaterial); }
-    const doorMaterial = new THREE.MeshStandardMaterial({ color: role.unlocked ? accentColor.clone().lerp(new THREE.Color(0xffffff), .2) : 0x33464b, emissive: role.unlocked ? accentColor : 0x000000, emissiveIntensity: role.unlocked ? .88 : 0, roughness: .25, metalness: .34 });
+    const doorMaterial = new THREE.MeshStandardMaterial({ color: role.unlocked ? accentColor.clone().lerp(new THREE.Color(0xffffff), .2) : 0x33464b, emissive: role.unlocked ? accentColor : 0x000000, emissiveIntensity: role.unlocked ? .88 : 0, roughness: .16, metalness: .18, transparent: true, opacity: .76 });
     const doorFrame = addBox(building, [Math.min(width * .39, 1.5), 2.12, .12], [0, 1.06, depth / 2 + .1], timber); doorFrame.name = 'campus-glazed-entry-frame';
     const door = addBox(building, [Math.min(width * .31, 1.25), 1.8, .14], [0, .91, depth / 2 + .18], doorMaterial); door.name = doorId;
     [-.31, .31].forEach((x) => { const mullion = addBox(building, [.045, 1.72, .06], [x, .94, depth / 2 + .27], trimMaterial); mullion.name = 'campus-entry-mullion'; });
     addBox(building, [Math.min(width * .31, 1.2), .05, .16], [0, 1.39, depth / 2 + .27], trimMaterial).name = 'campus-entry-transom';
-    [-1, 1].forEach((side) => { const sconce = new THREE.Mesh(new THREE.SphereGeometry(.09, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffe3a0, emissive: 0xffa43d, emissiveIntensity: .9, roughness: .32 })); sconce.name = 'campus-entry-sconce'; sconce.position.set(side * .83, 1.74, depth / 2 + .3); building.add(sconce); });
+    [-1, 1].forEach((side) => { const sconce = new THREE.Mesh(new THREE.SphereGeometry(.09, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffe3a0, emissive: 0xffa43d, emissiveIntensity: .9, roughness: .32 })); sconce.name = 'campus-entry-sconce'; sconce.position.set(side * .83, 1.74, depth / 2 + .3); building.add(sconce); const light = new THREE.PointLight(0xffba61, .45, 2.1); light.name = 'campus-entry-sconce-light'; light.position.copy(sconce.position); building.add(light); });
     const portal = role.unlocked ? addArcadePortal(building, accentColor, depth) : null;
     const sign = addCampusSign(building, role, width, height, depth, signTextureFactory); door.userData = { roleId: role.id, doorMaterial, sign, portal, baseEmissive: doorMaterial.emissiveIntensity }; doors.push(door); buildings.push(building); scene.add(building);
   });

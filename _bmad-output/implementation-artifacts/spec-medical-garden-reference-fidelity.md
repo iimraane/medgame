@@ -75,6 +75,12 @@ context: []
 - `medium` / patch — Garden composition assertions were source-text regexes only; deterministic composition will be executable and inspected by the campus tests.
 - `medium` / patch — The verification review confirmed that paver/curb/mountain/cloud/camera configuration could be removed from the scene while source regexes still passed; this is covered by the executable composition test patch.
 - `medium` / patch — The verification review confirmed that roof-tile object counts could remain correct while tiles were off-plane; this is covered by the transform test and geometry correction.
+- `false` — The build artifact has no reliable repository-side asset contract because `dist/` is ignored; the generated change was removed rather than committing a stale entry point.
+- `medium` / patch — The instantiated pavers did not span the full visible approach; the bounded instanced sequence now covers the path end-to-end.
+- `medium` / patch — The entry material was opaque and the battens had a mismatched roof angle; the entries are now translucent raycastable glass and batten slope derives from the same roof width.
+- `low` / patch — Sconces were decorative emissive spheres only; each pavilion now has two tightly bounded warm sconce lights.
+- `medium` / patch — Scene attachment and foliage density could regress while standalone constants continued to pass; composition attachment and real placement bounds now run in the test suite.
+- `low` / patch — Locked-door emission was unverified; the construction test now distinguishes non-emissive locked glass from playable portal doors.
 
 ## Design Notes
 

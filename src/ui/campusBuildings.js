@@ -8,7 +8,7 @@ function addGableRoof(group, width, depth, roofHeight, position, material) {
 
 function addRoofTiles(building, width, depth, wallHeight, roofHeight, material) {
   const slope = Math.atan2(roofHeight, width / 2);
-  const rows = 7;
+  const rows = 14;
   [-1, 1].forEach((side) => {
     for (let row = 0; row < rows; row += 1) {
       const run = ((row + .5) / rows) * (width / 2);
@@ -18,6 +18,22 @@ function addRoofTiles(building, width, depth, wallHeight, roofHeight, material) 
       tile.rotation.z = -side * slope;
     }
   });
+}
+
+function addFacadeMasonry(building, width, height, depth, material) {
+  for (let row = 1; row < 8; row += 1) {
+    const joint = addBox(building, [width - .08, .018, .025], [0, row * (height / 8), depth / 2 + .052], material);
+    joint.name = 'campus-facade-masonry-joint';
+  }
+  for (let column = -2; column <= 2; column += 1) {
+    const joint = addBox(building, [.018, height - .18, .025], [column * width / 5 + (column % 2 ? .06 : -.04), height / 2, depth / 2 + .054], material);
+    joint.name = 'campus-facade-masonry-joint';
+  }
+}
+
+function addWindowDetails(building, x, y, width, depth, trimMaterial, sillMaterial) {
+  addBox(building, [width * .25, .07, .12], [x, y - .29, depth / 2 + .09], sillMaterial).name = 'campus-window-sill';
+  addBox(building, [width * .25, .055, .1], [x, y + .29, depth / 2 + .085], trimMaterial).name = 'campus-window-lintel';
 }
 
 function addCampusSign(building, role, width, height, depth, signTextureFactory) {
@@ -51,16 +67,18 @@ export function createCampusBuildings(roles, signTextureFactory, atlas = null) {
   roles.forEach((role) => {
     const { position, footprint, accent, doorId } = role.campus; const [width, height, depth] = footprint;
     const building = new THREE.Group(); building.name = `campus-house-${role.id}`; building.position.set(...position); const accentColor = new THREE.Color(accent);
-    const concrete = new THREE.MeshStandardMaterial({ color: 0xd5c7b2, roughness: .88, metalness: .03, bumpMap: atlas, bumpScale: .075 });
-    const stone = new THREE.MeshStandardMaterial({ color: 0xa9987d, map: atlas, roughness: .94 });
-    const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x273439, map: atlas, roughness: .78, metalness: .1 });
-    const roofTileMaterial = new THREE.MeshStandardMaterial({ color: 0x172328, roughness: .82, metalness: .08 });
-    const windowMaterial = new THREE.MeshStandardMaterial({ color: 0xffedbd, emissive: 0xc47832, emissiveIntensity: .55, roughness: .28, metalness: .16 });
-    const timber = new THREE.MeshStandardMaterial({ color: 0x745039, roughness: .8, metalness: .02 }); const trimMaterial = new THREE.MeshStandardMaterial({ color: 0xf6edda, roughness: .64 }); const roofDetailMaterial = new THREE.MeshStandardMaterial({ color: 0x1c2a2f, roughness: .68, metalness: .18 });
+    const concrete = new THREE.MeshStandardMaterial({ color: 0xd5c7b2, roughness: .83, metalness: .03, bumpMap: atlas, bumpScale: .11 });
+    const stone = new THREE.MeshStandardMaterial({ color: 0xa9987d, map: atlas, roughness: .91, bumpMap: atlas, bumpScale: .07 });
+    const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x273439, map: atlas, bumpMap: atlas, bumpScale: .055, roughness: .68, metalness: .14 });
+    const roofTileMaterial = new THREE.MeshStandardMaterial({ color: 0x172328, roughness: .7, metalness: .12 });
+    const windowMaterial = new THREE.MeshPhysicalMaterial({ color: 0xdff7ef, emissive: 0xc47832, emissiveIntensity: .42, roughness: .13, metalness: .08, transmission: .12, thickness: .12 });
+    const timber = new THREE.MeshStandardMaterial({ color: 0x745039, roughness: .72, metalness: .02 }); const trimMaterial = new THREE.MeshStandardMaterial({ color: 0xf6edda, roughness: .57 }); const roofDetailMaterial = new THREE.MeshStandardMaterial({ color: 0x1c2a2f, roughness: .57, metalness: .24 }); const masonryJoint = new THREE.MeshStandardMaterial({ color: 0x9d8b73, roughness: .95 }); const sillMaterial = new THREE.MeshStandardMaterial({ color: 0x8f806c, roughness: .86 });
     const wall = addBox(building, [width, height, depth], [0, height / 2, 0], concrete); wall.name = 'campus-house-wall';
+    addFacadeMasonry(building, width, height, depth, masonryJoint);
     const roof = addGableRoof(building, width + .22, depth + .18, .82, [0, height, 0], roofMaterial); roof.name = 'campus-house-roof';
     addRoofTiles(building, width + .22, depth + .18, height, .82, roofTileMaterial);
-    const roofWidth = width + .22; const roofSlope = Math.atan2(.82, roofWidth / 2); [-1, 1].forEach((side) => { const batten = addBox(building, [roofWidth * .49, .045, depth + .23], [side * roofWidth * .245, height + .41, 0], roofDetailMaterial); batten.rotation.z = -side * roofSlope; });
+    const roofWidth = width + .22; const roofSlope = Math.atan2(.82, roofWidth / 2); [-1, 1].forEach((side) => { const batten = addBox(building, [roofWidth * .49, .065, depth + .25], [side * roofWidth * .245, height + .41, 0], roofDetailMaterial); batten.rotation.z = -side * roofSlope; batten.name = 'campus-roof-batten'; });
+    const ridge = new THREE.Mesh(new THREE.CylinderGeometry(.07, .07, depth + .3, 10), roofDetailMaterial); ridge.name = 'campus-roof-ridge'; ridge.rotation.x = Math.PI / 2; ridge.position.set(0, height + .84, 0); ridge.castShadow = true; building.add(ridge);
     const soffit = addBox(building, [width + .24, .17, depth + .24], [0, height - .08, 0], timber); soffit.name = 'campus-timber-soffit';
     addBox(building, [width * .66, .13, .84], [0, .07, depth / 2 + .42], timber).name = 'campus-entry-step';
     addBox(building, [width * .54, .12, .62], [0, .19, depth / 2 + .56], trimMaterial).name = 'campus-entry-step';
@@ -69,9 +87,10 @@ export function createCampusBuildings(roles, signTextureFactory, atlas = null) {
       const post = addBox(building, [.12, 1.2, .13], [side * width * .21, .72, depth / 2 + .58], timber); post.name = 'campus-timber-entry-post';
       addBox(building, [.13, height * .9, .08], [side * (width / 2 + .02), height * .49, depth / 2 + .045], trimMaterial);
     });
-    [-.27, .27].forEach((x) => { const window = addBox(building, [width * .18, .48, .06], [x * width, 1.47, depth / 2 + .04], windowMaterial); window.name = 'campus-house-window'; addWindowMuntins(building, x * width, 1.47, width, depth, trimMaterial); }); for (let column = -1; column <= 1; column += 2) { const window = addBox(building, [width * .18, .48, .06], [column * width * .29, 2.45, depth / 2 + .04], windowMaterial); window.name = 'campus-house-window'; addWindowMuntins(building, column * width * .29, 2.45, width, depth, trimMaterial); }
+    [-.27, .27].forEach((x) => { const window = addBox(building, [width * .18, .48, .06], [x * width, 1.47, depth / 2 + .04], windowMaterial); window.name = 'campus-house-window'; addWindowMuntins(building, x * width, 1.47, width, depth, trimMaterial); addWindowDetails(building, x * width, 1.47, width, depth, trimMaterial, sillMaterial); }); for (let column = -1; column <= 1; column += 2) { const window = addBox(building, [width * .18, .48, .06], [column * width * .29, 2.45, depth / 2 + .04], windowMaterial); window.name = 'campus-house-window'; addWindowMuntins(building, column * width * .29, 2.45, width, depth, trimMaterial); addWindowDetails(building, column * width * .29, 2.45, width, depth, trimMaterial, sillMaterial); }
     const doorMaterial = new THREE.MeshStandardMaterial({ color: role.unlocked ? accentColor.clone().lerp(new THREE.Color(0xffffff), .2) : 0x33464b, emissive: role.unlocked ? accentColor : 0x000000, emissiveIntensity: role.unlocked ? .88 : 0, roughness: .16, metalness: .18, transparent: true, opacity: .76 });
     const doorFrame = addBox(building, [Math.min(width * .39, 1.5), 2.12, .12], [0, 1.06, depth / 2 + .1], timber); doorFrame.name = 'campus-glazed-entry-frame';
+    addBox(building, [Math.min(width * .53, 1.9), .12, .72], [0, 2.38, depth / 2 + .38], timber).name = 'campus-entry-canopy';
     const door = addBox(building, [Math.min(width * .31, 1.25), 1.8, .14], [0, .91, depth / 2 + .18], doorMaterial); door.name = doorId;
     [-.31, .31].forEach((x) => { const mullion = addBox(building, [.045, 1.72, .06], [x, .94, depth / 2 + .27], trimMaterial); mullion.name = 'campus-entry-mullion'; });
     addBox(building, [Math.min(width * .31, 1.2), .05, .16], [0, 1.39, depth / 2 + .27], trimMaterial).name = 'campus-entry-transom';

@@ -43,14 +43,17 @@ test('constructed campus houses stay opaque and attach arcade portals only to pl
     for (const name of ['campus-house-wall', 'campus-house-roof', 'campus-house-window', 'campus-profession-sign']) assert.equal(building.getObjectByName(name).material.transparent, false);
     assert.equal(building.getObjectsByProperty('name', 'campus-house-window-muntin').length, 12);
     assert.equal(building.getObjectsByProperty('name', 'campus-stone-pier').length, 2);
-    assert.equal(building.getObjectsByProperty('name', 'campus-roof-tile').length, 14);
+    assert.equal(building.getObjectsByProperty('name', 'campus-roof-tile').length, 28);
     assert.equal(building.getObjectsByProperty('name', 'campus-entry-sconce').length, 2);
     assert.equal(building.getObjectsByProperty('name', 'campus-entry-sconce-light').length, 2);
     assert.ok(building.getObjectByName('campus-timber-soffit'));
     assert.ok(building.getObjectByName('campus-glazed-entry-frame'));
+    assert.ok(building.getObjectByName('campus-roof-ridge'));
+    assert.ok(building.getObjectByName('campus-entry-canopy'));
+    assert.ok(building.getObjectsByProperty('name', 'campus-facade-masonry-joint').length >= 12);
     const tiles = building.getObjectsByProperty('name', 'campus-roof-tile'); const roofWidth = 3.8 + .22; const slope = Math.atan2(.82, roofWidth / 2);
-    assert.ok(tiles[0].position.x < 0); assert.ok(tiles[7].position.x > 0);
-    assert.ok(Math.abs(tiles[0].rotation.z - slope) < 1e-9); assert.ok(Math.abs(tiles[7].rotation.z + slope) < 1e-9);
+    assert.ok(tiles[0].position.x < 0); assert.ok(tiles[14].position.x > 0);
+    assert.ok(Math.abs(tiles[0].rotation.z - slope) < 1e-9); assert.ok(Math.abs(tiles[14].rotation.z + slope) < 1e-9);
     assert.ok(Math.abs(tiles[0].position.y - (4.2 + .82 - Math.abs(tiles[0].position.x) * (.82 / (roofWidth / 2)))) < 1e-9);
     assert.ok(Math.abs(tiles[7].position.y - (4.2 + .82 - Math.abs(tiles[7].position.x) * (.82 / (roofWidth / 2)))) < 1e-9);
   }
@@ -62,18 +65,17 @@ test('constructed campus houses stay opaque and attach arcade portals only to pl
   animateArcadePortals(portalDoors, 520, true); assert.equal(portal.chevrons.position.y, 0); assert.equal(portal.portal.rotation.y, 0);
 });
 
-test('the hub uses local Three.js doors with a semantic destination list', () => {
+test('the hub mounts a live local Three.js canvas with a semantic destination list', () => {
   assert.match(hub, /import \* as THREE from 'three'/);
   assert.match(hub, /new THREE\.WebGLRenderer/);
   assert.match(hub, /new THREE\.Raycaster/);
-  assert.match(hub, /campus-scene--reference/);
-  assert.match(hub, /campus-reference-hotspot/);
+  assert.match(hub, /class="campus-canvas"/);
   assert.match(hub, /class="campus-destination-list/);
   assert.match(hub, /campus-destination-list--sr-only/);
   assert.match(hub, /createSignTexture/);
   assert.match(hub, /medical-concrete-glass-atlas\.png/);
   assert.match(hub, /shouldExitCampusOnEscape/);
-  assert.doesNotMatch(hub, /campus-hub\.png|campus-panel-|campus-kiosk|campus-directory|new Image\(/);
+  assert.doesNotMatch(hub, /medical-garden-reference|campus-reference-|campus-hub\.png|campus-panel-|campus-kiosk|campus-directory|new Image\(/);
   assert.match(hub, /createCampusBuildings/);
   assert.match(hub, /GLTFLoader/);
   for (const filename of ['tree_detailed.glb', 'tree_oak.glb', 'grass_large.glb', 'flower_yellowB.glb', 'flower_purpleB.glb', 'rock_largeA.glb', 'rock_smallE.glb']) assert.match(gardenComposition, new RegExp(filename.replace('.', '\\.')));
@@ -82,8 +84,11 @@ test('the hub uses local Three.js doors with a semantic destination list', () =>
   assert.match(hub, /addMountainRange|campus-mountain-layer|addCloud/);
   assert.match(hub, /CAMPUS_COMPOSITION/);
   assert.match(hub, /intersectObjects\(doors, false\)/);
+  assert.match(hub, /window\.addEventListener\('resize', onViewportChange\)/);
+  assert.match(hub, /!canInitializeCampus\(window\.innerWidth\) && world/);
   assert.doesNotMatch(hub, /silhouette ===/);
   assert.match(css, /\.campus-canvas/);
+  assert.doesNotMatch(css, /medical-garden-reference|campus-reference-/);
 });
 
 test('the medical garden composition has an executable continuous approach and configured horizon', () => {
@@ -95,6 +100,8 @@ test('the medical garden composition has an executable continuous approach and c
   assert.equal(pavers.isInstancedMesh, true);
   assert.equal(pavers.count, CAMPUS_COMPOSITION.pavers.columns * CAMPUS_COMPOSITION.pavers.rows);
   assert.equal(pavers.castShadow, false);
+  assert.equal(pavers.instanceColor, null);
+  assert.equal(pavers.material.color.getHex(), 0xe6cd9b);
   const first = new THREE.Matrix4(); const last = new THREE.Matrix4(); const firstPosition = new THREE.Vector3(); const lastPosition = new THREE.Vector3();
   pavers.getMatrixAt(0, first); pavers.getMatrixAt(pavers.count - 1, last); firstPosition.setFromMatrixPosition(first); lastPosition.setFromMatrixPosition(last);
   assert.ok(firstPosition.z - lastPosition.z > 29.39);

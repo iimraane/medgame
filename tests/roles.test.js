@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { ROLES, getCampusHubSummary, getDoorAction, getRole } from '../src/data/roles.js';
 import { animateArcadePortals, createCampusBuildings, setArcadePortalHighlight } from '../src/ui/campusBuildings.js';
 import { loadLocalLandscapeModels } from '../src/ui/campusLandscapeAssets.js';
+import { CAMPUS_COMPOSITION, createPaverApproach } from '../src/ui/campusGardenComposition.js';
 import { isCampusDesktop } from '../src/ui/campusPanelState.js';
 import { canInitializeCampus, createCampusLifecycle, resolveCampusSelection, shouldExitCampusOnEscape } from '../src/ui/campusHubState.js';
 import { createOriginGuard, getAllowedOrigins, isAllowedOrigin } from '../server/origins.js';
@@ -37,7 +38,20 @@ test('the campus config exposes five uniform opaque house destinations', () => {
 test('constructed campus houses stay opaque and attach arcade portals only to playable doors', () => {
   const { doors, buildings } = createCampusBuildings(Object.values(ROLES), () => new THREE.Texture());
   assert.equal(buildings.length, 5); assert.equal(doors.length, 5);
-  for (const building of buildings) { for (const name of ['campus-house-wall', 'campus-house-roof', 'campus-house-window', 'campus-profession-sign']) assert.equal(building.getObjectByName(name).material.transparent, false); assert.equal(building.getObjectsByProperty('name', 'campus-house-window-muntin').length, 12); }
+  for (const building of buildings) {
+    for (const name of ['campus-house-wall', 'campus-house-roof', 'campus-house-window', 'campus-profession-sign']) assert.equal(building.getObjectByName(name).material.transparent, false);
+    assert.equal(building.getObjectsByProperty('name', 'campus-house-window-muntin').length, 12);
+    assert.equal(building.getObjectsByProperty('name', 'campus-stone-pier').length, 2);
+    assert.equal(building.getObjectsByProperty('name', 'campus-roof-tile').length, 14);
+    assert.equal(building.getObjectsByProperty('name', 'campus-entry-sconce').length, 2);
+    assert.ok(building.getObjectByName('campus-timber-soffit'));
+    assert.ok(building.getObjectByName('campus-glazed-entry-frame'));
+    const tiles = building.getObjectsByProperty('name', 'campus-roof-tile'); const roofWidth = 3.8 + .22; const slope = Math.atan2(.82, roofWidth / 2);
+    assert.ok(tiles[0].position.x < 0); assert.ok(tiles[7].position.x > 0);
+    assert.ok(Math.abs(tiles[0].rotation.z - slope) < 1e-9); assert.ok(Math.abs(tiles[7].rotation.z + slope) < 1e-9);
+    assert.ok(Math.abs(tiles[0].position.y - (4.2 + .82 - Math.abs(tiles[0].position.x) * (.82 / (roofWidth / 2)))) < 1e-9);
+    assert.ok(Math.abs(tiles[7].position.y - (4.2 + .82 - Math.abs(tiles[7].position.x) * (.82 / (roofWidth / 2)))) < 1e-9);
+  }
   const portalDoors = doors.filter((door) => door.userData.portal); assert.deepEqual(portalDoors.map((door) => door.userData.roleId), ['dietetics', 'nursing']);
   assert.equal(portalDoors.every((door) => !doors.includes(door.userData.portal.portal)), true);
   const portal = portalDoors[0].userData.portal; setArcadePortalHighlight(portalDoors[0], true); assert.equal(portal.light.intensity, 3.5); assert.equal(portal.portal.scale.x, 1.09);
@@ -59,9 +73,27 @@ test('the hub uses local Three.js doors with a semantic destination list', () =>
   assert.match(hub, /GLTFLoader/);
   for (const filename of ['tree_detailed.glb', 'tree_oak.glb', 'grass_large.glb', 'flower_yellowB.glb', 'flower_purpleB.glb', 'rock_largeA.glb', 'rock_smallE.glb']) assert.match(hub, new RegExp(filename.replace('.', '\\.')));
   assert.match(hub, /addFlowerBed|addShrub|addBench|addLamp|addRock/);
+  assert.match(hub, /createPaverApproach|campus-paver-approach|campus-path-curb/);
+  assert.match(hub, /addMountainRange|campus-mountain-layer|addCloud/);
+  assert.match(hub, /CAMPUS_COMPOSITION/);
   assert.match(hub, /intersectObjects\(doors, false\)/);
   assert.doesNotMatch(hub, /silhouette ===/);
   assert.match(css, /\.campus-canvas/);
+});
+
+test('the medical garden composition has an executable continuous approach and configured horizon', () => {
+  assert.deepEqual(CAMPUS_COMPOSITION.camera.position, [0, 4.35, 22.8]);
+  assert.deepEqual(CAMPUS_COMPOSITION.camera.target, [0, 1.95, -.35]);
+  assert.equal(CAMPUS_COMPOSITION.horizon.mountains.length, 3);
+  assert.equal(CAMPUS_COMPOSITION.horizon.clouds.length, 4);
+  const pavers = createPaverApproach();
+  assert.equal(pavers.isInstancedMesh, true);
+  assert.equal(pavers.count, CAMPUS_COMPOSITION.pavers.columns * CAMPUS_COMPOSITION.pavers.rows);
+  assert.equal(pavers.castShadow, false);
+  const first = new THREE.Matrix4(); const last = new THREE.Matrix4(); const firstPosition = new THREE.Vector3(); const lastPosition = new THREE.Vector3();
+  pavers.getMatrixAt(0, first); pavers.getMatrixAt(pavers.count - 1, last); firstPosition.setFromMatrixPosition(first); lastPosition.setFromMatrixPosition(last);
+  assert.ok(firstPosition.z - lastPosition.z > 20);
+  assert.ok(CAMPUS_COMPOSITION.pavers.depth >= CAMPUS_COMPOSITION.pavers.pitch);
 });
 
 test('campus landscape assets are local, licensed, and have a procedural fallback', () => {

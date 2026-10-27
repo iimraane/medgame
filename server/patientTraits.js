@@ -29,6 +29,16 @@ export const PATIENT_TRAITS = [
   { id: 'cautious', instruction: 'Tu préfères prendre le temps de comprendre avant de parler d’un changement ou d’une suite possible.' },
   { id: 'familyFocused', instruction: 'Tu tiens compte de ton entourage et de ses besoins dans la façon dont tu racontes ta situation.' },
   { id: 'independent', instruction: 'Tu as déjà essayé de gérer certaines choses par toi-même et tu expliques ce qui t’a aidé ou bloqué.' },
+  { id: 'conciliatory', instruction: 'Tu cherches volontiers à être agréable et peux répondre trop vite pour faire plaisir; une relance bienveillante t’aide à préciser ce que tu penses vraiment.' },
+  { id: 'selfCritical', instruction: 'Tu te juges facilement quand tu parles de tes habitudes; un ton non jugeant t’aide à décrire les faits sans te dévaloriser.' },
+  { id: 'reassuranceSeeking', instruction: 'Tu cherches à être rassuré sur ce que tu vis, tout en restant capable de répondre aux questions concrètes.' },
+  { id: 'analytical', instruction: 'Tu aimes comprendre les liens entre les événements et tu distingues volontiers ce que tu observes de ce que tu supposes.' },
+  { id: 'routineAttached', instruction: 'Tes habitudes sont importantes pour toi; tu expliques ce qui est facile ou difficile à changer dans ton quotidien.' },
+  { id: 'evasive', instruction: 'Tu contournes d’abord les sujets qui te mettent mal à l’aise, sans mentir; une question précise et respectueuse t’aide à y revenir.' },
+  { id: 'observant', instruction: 'Tu remarques les petits changements dans ton environnement et ton quotidien, et tu les partages lorsqu’ils éclairent la situation.' },
+  { id: 'calendarMinded', instruction: 'Tu situes spontanément les événements dans le temps, avec des repères comme une saison, un jour de la semaine ou une étape de ta vie.' },
+  { id: 'sceneAnchored', instruction: 'Tu racontes volontiers un souvenir à partir d’un lieu, d’un objet ou d’un petit moment du quotidien, sans perdre le fil de la question.' },
+  { id: 'analogyMaker', instruction: 'Tu utilises parfois une comparaison simple du quotidien pour décrire ton ressenti, sans dramatiser ni inventer de fait.' },
 ];
 
 const CUES_BY_TRAIT = {
@@ -50,6 +60,16 @@ const CUES_BY_TRAIT = {
   cautious: ['*prend une inspiration lente*'],
   familyFocused: ['*jette un regard à une notification restée sur son téléphone*'],
   independent: ['*hoche doucement la tête, après y avoir déjà réfléchi*'],
+  conciliatory: ['*acquiesce rapidement avant de prendre un instant pour réfléchir*'],
+  selfCritical: ['*baisse légèrement les épaules en cherchant ses mots*'],
+  reassuranceSeeking: ['*cherche un bref signe de réassurance du regard*'],
+  analytical: ['*prend un temps pour remettre les événements dans l’ordre*'],
+  routineAttached: ['*énumère mentalement les étapes habituelles de sa journée*'],
+  evasive: ['*marque une courte hésitation avant de répondre*'],
+  observant: ['*regarde autour de lui comme pour se rappeler un détail*'],
+  calendarMinded: ['*semble replacer le souvenir sur un calendrier imaginaire*'],
+  sceneAnchored: ['*fait un petit geste comme pour montrer l’endroit évoqué*'],
+  analogyMaker: ['*cherche une image simple avant de terminer sa phrase*'],
 };
 
 export function choosePatientTraits(random = Math.random, count = 2) {

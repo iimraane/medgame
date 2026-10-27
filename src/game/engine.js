@@ -1,6 +1,6 @@
 import { getMission, getMissionsForRole } from '../data/missions.js';
 import { getRole } from '../data/roles.js';
-import { startSession, sendMessage, evaluateMission, useConsultationTool, recordSecureNextStep, submitNursingHypothesis } from './ai.js';
+import { startSession, sendMessage, evaluateMission, useConsultationTool, recordSecureNextStep, submitNursingHypothesis, submitPsychologyFormulation } from './ai.js';
 import { loadSave, recordMissionResult, isMissionUnlocked, getRecentVariantIds, recordVariantId } from '../utils/storage.js';
 import { offlineFallbackFeedback } from './evaluation.js';
 
@@ -37,6 +37,16 @@ class GameEngine {
       const result = await submitNursingHypothesis(this.sessionId, diseaseId);
       this.isFinished = true;
       const save = recordMissionResult(this.mission.id, result);
+      this.onFinish?.({ ...result, mission: this.mission, progress: save.missionProgress[this.mission.id] });
+    } catch (error) { this.onError?.(error.message); }
+    finally { this.isWaiting = false; this.onEvaluating?.(false); }
+  }
+  async submitPsychologyFormulation(motifId, board, nextStep) {
+    if (this.isFinished || this.isWaiting || !motifId) return;
+    this.isWaiting = true; this.onEvaluating?.(true);
+    try {
+      const result = await submitPsychologyFormulation(this.sessionId, motifId, board, nextStep);
+      this.isFinished = true; const save = recordMissionResult(this.mission.id, result);
       this.onFinish?.({ ...result, mission: this.mission, progress: save.missionProgress[this.mission.id] });
     } catch (error) { this.onError?.(error.message); }
     finally { this.isWaiting = false; this.onEvaluating?.(false); }

@@ -32,7 +32,7 @@ test('the campus config exposes five uniform opaque house destinations', () => {
   assert.equal(new Set(Object.values(ROLES).map((role) => JSON.stringify(role.campus.footprint))).size, 1);
   assert.equal(new Set(Object.values(ROLES).map((role) => role.campus.materialAccent)).size, 1);
   assert.deepEqual(Object.values(ROLES).map(({ id, unlocked, campus }) => [id, campus.position, campus.accent, campus.sign, unlocked]), [
-    ['dietetics', [-7.2, 0, 1.4], '#8ee6a9', 'SERRE NUTRITION', true], ['generalPractice', [-3.7, 0, -2.2], '#8dc7ff', 'CLINIQUE · SOINS PRIMAIRES', false], ['nursing', [0, 0, 1.1], '#c5a7ff', 'ATELIER DU SOIN', true], ['psychology', [4, 0, -2], '#fa9bb5', 'CONSERVATOIRE · ÉCOUTE', false], ['pharmacy', [7.3, 0, 1.2], '#77e9cb', 'PHARMACIE · REMÈDES', false],
+    ['dietetics', [-7.2, 0, 1.4], '#8ee6a9', 'SERRE NUTRITION', true], ['generalPractice', [-3.7, 0, -2.2], '#8dc7ff', 'CLINIQUE · SOINS PRIMAIRES', false], ['nursing', [0, 0, 1.1], '#c5a7ff', 'ATELIER DU SOIN', true], ['psychology', [4, 0, -2], '#fa9bb5', 'CONSERVATOIRE · ÉCOUTE', true], ['pharmacy', [7.3, 0, 1.2], '#77e9cb', 'PHARMACIE · REMÈDES', false],
   ]);
 });
 
@@ -57,7 +57,7 @@ test('constructed campus houses stay opaque and attach arcade portals only to pl
     assert.ok(Math.abs(tiles[0].position.y - (4.2 + .82 - Math.abs(tiles[0].position.x) * (.82 / (roofWidth / 2)))) < 1e-9);
     assert.ok(Math.abs(tiles[7].position.y - (4.2 + .82 - Math.abs(tiles[7].position.x) * (.82 / (roofWidth / 2)))) < 1e-9);
   }
-  const portalDoors = doors.filter((door) => door.userData.portal); assert.deepEqual(portalDoors.map((door) => door.userData.roleId), ['dietetics', 'nursing']);
+  const portalDoors = doors.filter((door) => door.userData.portal); assert.deepEqual(portalDoors.map((door) => door.userData.roleId), ['dietetics', 'nursing', 'psychology']);
   assert.equal(portalDoors.every((door) => door.material.transparent && door.material.emissiveIntensity > 0), true);
   assert.equal(doors.filter((door) => !door.userData.portal).every((door) => door.material.transparent && door.material.emissiveIntensity === 0), true);
   assert.equal(portalDoors.every((door) => !doors.includes(door.userData.portal.portal)), true);
@@ -144,10 +144,10 @@ test('local landscape loader clones loaded assets, records failures, and dispose
 
 test('playable destination data remains available without visible scene chrome', () => {
   const summary = getCampusHubSummary();
-  assert.equal(summary.playableCount, 2);
-  assert.equal(summary.playableLabel, '2 parcours jouables');
-  assert.equal(summary.playableShare, '40%');
-  assert.deepEqual(summary.roleStates.filter((role) => role.state === 'playable').map((role) => role.id), ['dietetics', 'nursing']);
+  assert.equal(summary.playableCount, 3);
+  assert.equal(summary.playableLabel, '3 parcours jouables');
+  assert.equal(summary.playableShare, '60%');
+  assert.deepEqual(summary.roleStates.filter((role) => role.state === 'playable').map((role) => role.id), ['dietetics', 'nursing', 'psychology']);
   assert.doesNotMatch(hub, /class="campus-hud"/);
   assert.match(hub, /role\.unlocked \? 'Parcours jouable' : role\.unlockRequirement/);
 });
@@ -167,7 +167,7 @@ test('role selection enters only playable routes and previews locked doors', () 
   assert.match(getDoorAction('missing').feedback, /ne peut pas être ouvert/);
   assert.deepEqual(resolveCampusSelection('dietetics', getDoorAction), { kind: 'levels', roleId: 'dietetics' });
   assert.deepEqual(resolveCampusSelection('nursing', getDoorAction), { kind: 'levels', roleId: 'nursing' });
-  assert.deepEqual(resolveCampusSelection('psychology', getDoorAction), { kind: 'preview', feedback: 'Psychologie : parcours verrouillé. Bientôt disponible.' });
+  assert.deepEqual(resolveCampusSelection('psychology', getDoorAction), { kind: 'levels', roleId: 'psychology' });
   assert.deepEqual(resolveCampusSelection('nursing', getDoorAction, true), { kind: 'ignore' });
 });
 

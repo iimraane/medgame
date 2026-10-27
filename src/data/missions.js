@@ -13,6 +13,8 @@ export const MISSIONS = [
   ['dietetics-incomplete-file', 'Le dossier incomplet', '🧩', 'Avancer prudemment parmi plusieurs contextes qui se croisent.'],
 ].map(([id, title, icon, summary], index) => ({ id, roleId: 'dietetics', order: index + 1, title, icon, summary }));
 import { NURSING_POOLS } from './nursingCampaign.js';
-MISSIONS.push(...NURSING_POOLS.map((pool) => ({ id: `nursing-${pool.order}`, roleId: 'nursing', order: pool.order, title: pool.theme, icon: '🩹', summary: 'Simulation éducative fictive : explorer, vérifier et formuler une hypothèse.' })));
+import { PSYCHOLOGY_POOLS } from './psychologyCampaign.js';
+MISSIONS.push(...NURSING_POOLS.map((pool) => ({ id: `nursing-${pool.order}`, roleId: 'nursing', order: pool.order, title: '', icon: '🩹', summary: '' })));
+MISSIONS.push(...PSYCHOLOGY_POOLS.map((pool) => ({ id: `psychology-${pool.order}`, roleId: 'psychology', order: pool.order, title: '', icon: '💬', summary: '' })));
 export function getMission(id) { return MISSIONS.find((mission) => mission.id === id); }
 export function getMissionsForRole(roleId) { return MISSIONS.filter((mission) => mission.roleId === roleId); }

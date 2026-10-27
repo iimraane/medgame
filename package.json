@@ -7,6 +7,8 @@
         "dev": "vite",
         "build": "vite build && node scripts/verify-dist.mjs",
         "test": "node --test tests/*.test.js",
+        "test:browser": "playwright test",
+        "test:visual": "playwright test tests/visual",
         "preview": "vite preview",
         "worker:dev": "npm run build && wrangler dev",
         "deploy": "npm run build && wrangler deploy",
@@ -23,6 +25,7 @@
         "three": "0.180.0"
     },
     "devDependencies": {
+        "@playwright/test": "^1.64.1",
         "vite": "^6.1.0",
         "wrangler": "^4.0.0"
     }

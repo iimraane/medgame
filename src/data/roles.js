@@ -52,8 +52,7 @@ export const ROLES = {
     icon: '💬',
     description: 'Écouter avec attention et créer un espace de parole sûr.',
     theme: 'psychology',
-    unlocked: false,
-    unlockRequirement: 'Bientôt disponible',
+    unlocked: true,
     campus: { doorId: 'door-psychology', position: [4, 0, -2], footprint: [3.8, 4.2, 3.2], accent: '#fa9bb5', landmark: 'Conservatoire de l’écoute', silhouette: 'house', sign: 'CONSERVATOIRE · ÉCOUTE', materialAccent: 'warm concrete', preview: 'Un futur espace de pratique pour créer une parole sûre et attentive.' },
     manual: {
       purpose: 'Créer un espace d’écoute sûr et comprendre les facteurs psychologiques.',

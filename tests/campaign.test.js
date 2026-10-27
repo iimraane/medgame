@@ -4,6 +4,9 @@ import fs from 'node:fs';
 import { MISSIONS } from '../src/data/missions.js';
 import { CASES, NURSING_CASES, MASTERY_THRESHOLD, chooseVariant, getEligibleTools, useConsultationTool, getNursingTools, useNursingTool, nursingLiveSymptoms, evaluateNursingHypothesis, evaluateServerMission } from '../server/missions.js';
 import { NURSING_POOL_SIZES } from '../src/data/nursingCampaign.js';
+import { PSYCHOLOGY_MOTIFS, PSYCHOLOGY_POOL_SIZES, PSYCHOLOGY_POOLS } from '../src/data/psychologyCampaign.js';
+import { PSYCHOLOGY_DOSSIERS, getPsychologyTools, usePsychologySupport } from '../server/psychologyDossiers.js';
+import { PSYCHOLOGY_CASES, choosePsychologyCase, evaluatePsychologyFormulation } from '../server/missions.js';
 import { NURSING_DISEASES } from '../src/data/nursingCampaign.js';
 import { NURSING_DOSSIERS, NURSING_DOCUMENT_DEFINITIONS, materializeNursingDossier } from '../server/nursingDossiers.js';
 import { buildMissionEvaluationPrompt, normalizeMissionEvaluation } from '../server/missionEvaluation.js';
@@ -12,9 +15,41 @@ import { PATIENT_TRAITS } from '../server/patientTraits.js';
 import { nextRecentVariantIds } from '../src/utils/storage.js';
 
 test('the browser exposes ten ordered cards per open campaign', () => {
-  assert.equal(MISSIONS.length, 20);
+  assert.equal(MISSIONS.length, 30);
   assert.deepEqual(MISSIONS.filter((mission) => mission.roleId === 'dietetics').map(({ id }) => id), Object.keys(CASES));
   for (const mission of MISSIONS) assert.deepEqual(Object.keys(mission).sort(), ['icon', 'id', 'order', 'roleId', 'summary', 'title']);
+});
+
+test('Psychology exposes exactly the approved cumulative public catalogue without private cases', () => {
+  assert.deepEqual(PSYCHOLOGY_POOLS.map((pool) => pool.motifIds.length), PSYCHOLOGY_POOL_SIZES);
+  assert.equal(Object.keys(PSYCHOLOGY_MOTIFS).length, 30);
+  assert.equal(MISSIONS.filter((mission) => mission.roleId === 'psychology').length, 10);
+  for (const card of Object.values(PSYCHOLOGY_MOTIFS)) {
+    assert.ok(card.label && card.description); assert.ok(card.signs.length >= 3 && card.signs.length <= 5);
+    assert.equal(new Set(card.signs).size, card.signs.length);
+    assert.equal(JSON.stringify(card).includes('requiredOrientation'), false);
+  }
+});
+
+test('Psychology dossiers rotate six coherent private cases and gate reusable supports', () => {
+  for (const [motifId, cases] of Object.entries(PSYCHOLOGY_DOSSIERS)) {
+    assert.equal(cases.length, 6, motifId); assert.equal(new Set(cases.map((item) => item.id)).size, 6);
+  }
+  const mission = PSYCHOLOGY_CASES['psychology-9']; const first = mission.blueprints[0];
+  assert.notEqual(choosePsychologyCase(mission, [first.id], () => 0).id, first.id);
+  assert.equal(getPsychologyTools(mission.order).length, 5);
+  const support = usePsychologySupport(first, 'daily-life-journal');
+  assert.ok(support.evidence.entries.length >= 2);
+  assert.equal(usePsychologySupport(first, 'forged'), null);
+});
+
+test('Psychology formulation uses the same binary correct-motif rule as Nursing', () => {
+  const mission = PSYCHOLOGY_CASES['psychology-10']; const variant = mission.blueprints.find((item) => item.requiredOrientation) || mission.blueprints[0];
+  const session = { mission, variant, messages: [] };
+  const correct = evaluatePsychologyFormulation(session, variant.motifId, [], '');
+  const incorrect = evaluatePsychologyFormulation(session, mission.motifs.find((motif) => motif.id !== variant.motifId).id, [], '');
+  assert.deepEqual({ mastery: correct.mastery, total: correct.total }, { mastery: true, total: 100 });
+  assert.deepEqual({ mastery: incorrect.mastery, total: incorrect.total }, { mastery: false, total: 0 });
 });
 
 test('Nursing has ten cumulative pools of 3 through 30 curated diseases and six cases per disease', () => {
@@ -308,6 +343,9 @@ test('patient prompts require natural spoken French without consultation meta-co
 test('every randomized patient trait remains compatible with both gendered prompt branches', () => {
   const nursingVariant = NURSING_CASES['nursing-1'].blueprints[2];
   const dieteticsVariant = CASES['dietetics-rhythm-overflow'].blueprints[0];
+  const addedTraitIds = ['conciliatory', 'selfCritical', 'reassuranceSeeking', 'analytical', 'routineAttached', 'evasive', 'observant', 'calendarMinded', 'sceneAnchored', 'analogyMaker'];
+  assert.equal(PATIENT_TRAITS.length, 38);
+  assert.deepEqual(PATIENT_TRAITS.slice(-10).map((trait) => trait.id), addedTraitIds);
   for (const trait of PATIENT_TRAITS) {
     for (const prompt of [buildMissionPatientPrompt(nursingVariant, 'direct', [], [trait]), buildMissionPatientPrompt(dieteticsVariant, 'direct', [], [trait])]) {
       assert.doesNotMatch(prompt, /·/);

@@ -17,6 +17,9 @@ export default defineConfig({
             '/api': {
                 target: 'http://localhost:3001',
                 changeOrigin: true,
+                // The local Express server is mounted beneath /game while the
+                // browser client uses the production /api contract.
+                rewrite: (path) => `/game${path}`,
             },
         },
     },

@@ -9,6 +9,7 @@ export async function renderChat(container, missionId) {
   const nursingCompletion = mission.roleId === 'nursing';
   container.innerHTML = `<div class="view chat career-chat"><div class="career-chat__debrief-loading" id="debrief-loading" role="status" aria-live="assertive" hidden><div><span class="career-chat__debrief-spinner" aria-hidden="true"></span><p>${nursingCompletion ? 'Validation de l’hypothèse…' : 'Préparation du débrief…'}</p><small>${nursingCompletion ? 'La maladie sélectionnée est vérifiée.' : 'L’analyse de l’échange est en cours.'}</small></div></div><div class="consultation-modal" id="tool-modal" hidden><div class="consultation-modal__content" role="dialog" aria-modal="true" aria-label="Support de consultation"><button class="btn btn--small" id="close-tool">Fermer</button><div id="tool-content"></div></div></div><header class="chat__header"><button class="btn btn--small btn--secondary" id="exit">← Carte</button><div class="chat__patient-info"><div class="chat__patient-name">${patient.name.fullName}</div></div></header><main class="chat__body"><aside class="consultation-tools"><h2>Outils de consultation</h2><div id="tools"></div></aside><section class="chat__messages-area"><div class="chat__messages" id="messages"><div class="message message--patient"><div class="message__bubble"></div></div></div><div class="chat__input-area"><div class="career-chat__composer"><textarea class="chat__input" id="input" rows="2" placeholder="Message…"></textarea><button class="career-chat__voice" id="voice" type="button" aria-label="Dicter un message" title="Dicter un message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Z"></path><path d="M19 11a7 7 0 0 1-14 0M12 18v3M8 21h8"></path></svg></button></div><div class="career-chat__actions"><button class="btn btn--primary" id="send">Envoyer</button><button class="btn btn--secondary" id="finish">Terminer et débriefer</button></div></div></section></main></div>`;
   let showDiseaseDetails = () => {};
+  let showPsychologyMotifDetails = () => {};
   if (mission.roleId === 'nursing') {
     const chatBody = container.querySelector('.chat__body');
     const toolsRail = container.querySelector('.consultation-tools');
@@ -112,6 +113,47 @@ export async function renderChat(container, missionId) {
     rail.querySelector('#submit-hypothesis').addEventListener('click', () => engine.submitNursingHypothesis(selectedDisease));
     container.querySelector('#finish').hidden = true;
   }
+  if (mission.roleId === 'psychology') {
+    const body = container.querySelector('.chat__body'); const rail = document.createElement('aside');
+    rail.className = 'psychology-rail'; rail.innerHTML = '<h2>Formulations à explorer</h2><p class="psychology-rail__hint" id="psychology-selection-hint">Clique pour consulter. Maintiens pour sélectionner.</p><p class="sr-only" id="psychology-selection-status" role="status" aria-live="polite"></p><div class="psychology-rail__cards"></div><button class="btn btn--primary" id="submit-psychology" disabled>Soumettre la formulation</button>';
+    body.classList.add('chat__body--psychology');
+    body.append(rail); let selected; const cards = rail.querySelector('.psychology-rail__cards');
+    cards.innerHTML = data.differential.map((motif) => `<button class="psychology-motif" data-motif="${motif.id}" aria-pressed="false" aria-haspopup="dialog" aria-describedby="psychology-selection-hint"><span>${motif.label}</span></button>`).join('');
+    const selectionStatus = rail.querySelector('#psychology-selection-status');
+    const selectMotif = (button) => {
+      selected = button.dataset.motif; const motif = data.differential.find((item) => item.id === selected);
+      cards.querySelectorAll('button').forEach((item) => { const isSelected = item === button; item.setAttribute('aria-pressed', String(isSelected)); item.classList.toggle('is-selected', isSelected); });
+      rail.querySelector('#submit-psychology').disabled = false;
+      selectionStatus.textContent = `${motif?.label || 'Cette formulation'} est sélectionnée. Vous pouvez maintenant soumettre la formulation.`;
+    };
+    const HOLD_DURATION = 850; const HOLD_MOVE_TOLERANCE = 12;
+    let holdTimer; let holdFrame; let heldButton; let heldPointerId; let holdOrigin; let suppressClickFor; let suppressClickCleanup;
+    const clearHold = (button) => { clearTimeout(holdTimer); cancelAnimationFrame(holdFrame); button?.classList.remove('is-holding'); button?.style.removeProperty('--hold-progress'); heldButton = undefined; heldPointerId = undefined; holdOrigin = undefined; };
+    const clearSuppressedClick = () => { clearTimeout(suppressClickCleanup); suppressClickFor = undefined; };
+    const beginHold = (button, event) => {
+      if (event.button !== undefined && event.button !== 0 || event.isPrimary === false || heldButton) return;
+      heldButton = button; heldPointerId = event.pointerId; holdOrigin = { x: event.clientX, y: event.clientY }; button.classList.add('is-holding');
+      if (event.pointerId !== undefined) button.setPointerCapture?.(event.pointerId);
+      const startedAt = performance.now();
+      const animate = (now) => { if (heldButton !== button) return; button.style.setProperty('--hold-progress', String(Math.min(1, (now - startedAt) / HOLD_DURATION))); holdFrame = requestAnimationFrame(animate); };
+      holdFrame = requestAnimationFrame(animate);
+      holdTimer = setTimeout(() => {
+        if (heldButton !== button) return;
+        if (heldPointerId !== undefined && button.hasPointerCapture?.(heldPointerId)) button.releasePointerCapture(heldPointerId);
+        clearHold(button); button.classList.add('is-hold-complete'); setTimeout(() => button.classList.remove('is-hold-complete'), 220);
+        selectMotif(button); suppressClickFor = button; suppressClickCleanup = setTimeout(clearSuppressedClick, 900);
+      }, HOLD_DURATION);
+    };
+    cards.querySelectorAll('button').forEach((button) => {
+      button.addEventListener('pointerdown', (event) => beginHold(button, event));
+      button.addEventListener('pointermove', (event) => { if (heldButton === button && heldPointerId === event.pointerId && holdOrigin && Math.hypot(event.clientX - holdOrigin.x, event.clientY - holdOrigin.y) > HOLD_MOVE_TOLERANCE) clearHold(button); });
+      ['pointerup', 'pointercancel', 'lostpointercapture', 'blur'].forEach((name) => button.addEventListener(name, (event) => { if (name === 'blur' || heldButton === button && (heldPointerId === undefined || heldPointerId === event.pointerId)) clearHold(button); }));
+      button.addEventListener('keydown', (event) => { if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) { event.preventDefault(); beginHold(button, event); } });
+      button.addEventListener('keyup', (event) => { if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); if (heldButton === button) clearHold(button); } });
+      button.addEventListener('click', (event) => { if (suppressClickFor === button) { event.preventDefault(); clearSuppressedClick(); return; } const motif = data.differential.find((item) => item.id === button.dataset.motif); if (motif) showPsychologyMotifDetails(motif, button); });
+    });
+    rail.querySelector('#submit-psychology').addEventListener('click', () => engine.submitPsychologyFormulation(selected, [], ''));
+  }
   const input = container.querySelector('#input'); const messages = container.querySelector('#messages');
   const renderText = (bubble, content, supportsCues = false) => {
     if (!supportsCues) { bubble.textContent = content; return; }
@@ -141,6 +183,15 @@ export async function renderChat(container, missionId) {
     disease.symptoms.forEach((sign, index) => { const item = document.createElement('article'); item.className = 'nursing-disease-modal__symptom'; item.innerHTML = `<span>Symptôme ${index + 1}</span><p></p>`; item.querySelector('p').textContent = displaySymptom(sign); cards.append(item); });
     toolContent.append(cards); openModal(`Détails de l’hypothèse : ${disease.name}`, opener);
   };
+  showPsychologyMotifDetails = (motif, opener) => {
+    toolContent.replaceChildren();
+    const title = document.createElement('h2'); title.textContent = motif.label; toolContent.append(title);
+    const description = document.createElement('p'); description.textContent = motif.description; toolContent.append(description);
+    const signs = document.createElement('section'); signs.className = 'psychology-motif-details';
+    const heading = document.createElement('h3'); heading.textContent = 'Signes possibles à explorer'; signs.append(heading);
+    const list = document.createElement('ul'); motif.signs.forEach((sign) => { const item = document.createElement('li'); item.textContent = sign; list.append(item); }); signs.append(list); toolContent.append(signs);
+    openModal(`Détails de la formulation : ${motif.label}`, opener);
+  };
   const showTool = (tool) => {
     toolContent.replaceChildren(); const title = document.createElement('h2'); title.textContent = tool.label; toolContent.append(title);
     if (tool.evidence.images) {
@@ -162,6 +213,10 @@ export async function renderChat(container, missionId) {
       const docPanel = document.createElement('section'); docPanel.className = 'consultation-evidence consultation-evidence--nursing-document';
       const label = document.createElement('p'); label.className = 'consultation-evidence__disclaimer'; label.textContent = 'Repères d’apprentissage liés au cas en cours, sans consigne de soins.'; docPanel.append(label);
       tool.evidence.facts.forEach((fact) => { const item = document.createElement('p'); item.textContent = fact; docPanel.append(item); }); toolContent.append(docPanel);
+    } else if (tool.kind?.startsWith('psychology-')) {
+      const panel = document.createElement('section'); panel.className = `consultation-evidence consultation-evidence--${tool.kind}`;
+      const values = tool.evidence.entries || tool.evidence.events || tool.evidence.people || tool.evidence.steps || tool.evidence.fragments || [];
+      values.forEach((value) => { const item = document.createElement('p'); item.textContent = typeof value === 'string' ? value : `${value.moment || value.name} : ${value.text || value.link}`; panel.append(item); }); toolContent.append(panel);
     } else {
       const panel = document.createElement('div'); panel.className = `consultation-evidence consultation-evidence--${tool.kind}`; tool.evidence.notes.forEach((note, index) => { const item = document.createElement('div'); item.className = 'consultation-evidence__item'; item.innerHTML = `<span>${tool.kind === 'journal' ? ['Matin', 'Après-midi'][index] : ['Réserve', 'Réfrigérateur'][index]}</span><p></p>`; item.querySelector('p').textContent = note; panel.append(item); }); toolContent.append(panel);
     }
@@ -170,7 +225,7 @@ export async function renderChat(container, missionId) {
   const renderTools = (tools) => { const rail = container.querySelector('#tools'); rail.innerHTML = tools.length ? tools.map((tool) => `<button class="btn btn--secondary consultation-tool" data-tool="${tool.id}">${tool.label}</button>`).join('') : '<p class="consultation-tool__empty">Tous les outils disponibles ont été consultés.</p>'; rail.querySelectorAll('[data-tool]').forEach((button) => button.addEventListener('click', () => engine.useTool(button.dataset.tool))); };
   if (mission.roleId !== 'nursing') { renderTools(data.tools || []); engine.onTools = renderTools; } closeTool.addEventListener('click', closeModal);
   container.querySelector('#exit').addEventListener('click', () => navigate('levels', { roleId: mission.roleId }));
-  const add = (message) => { if (message.role === 'tool') { showTool(message); return; } const item = document.createElement('div'); item.className = `message message--${message.role === 'doctor' ? 'doctor' : 'patient'}`; item.innerHTML = `<div class="message__bubble"></div>`; renderText(item.querySelector('.message__bubble'), message.content, message.role === 'patient'); messages.appendChild(item); messages.scrollTop = messages.scrollHeight; };
+  const add = (message) => { if (message.role === 'tool') { showTool(message); const values = message.evidence?.entries || message.evidence?.events || message.evidence?.people || message.evidence?.steps || message.evidence?.fragments || []; engine.onPsychologyFact?.({ role: 'support', content: values.map((value) => typeof value === 'string' ? value : `${value.moment || value.name} : ${value.text || value.link}`).join(' ') }); return; } const item = document.createElement('div'); item.className = `message message--${message.role === 'doctor' ? 'doctor' : 'patient'}`; item.innerHTML = `<div class="message__bubble"></div>`; renderText(item.querySelector('.message__bubble'), message.content, message.role === 'patient'); messages.appendChild(item); messages.scrollTop = messages.scrollHeight; engine.onPsychologyFact?.(message); };
   engine.onMessage = add; engine.onError = (message) => alert(message); engine.onGuardrailFail = (message) => alert(message); engine.onTyping = () => {}; engine.onEvaluating = (active) => { container.querySelector('#debrief-loading').hidden = !active; };
   const send = async () => { const text = input.value.trim(); if (!text) return; input.value = ''; await engine.sendDoctorMessage(text); };
   container.querySelector('#send').addEventListener('click', send); input.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } });

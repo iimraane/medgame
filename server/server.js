@@ -18,7 +18,7 @@ const { LEVELS, getLevel } = await import(pathToFileURL(join(dataDir, 'levels.js
 const { CARDS, getCardsForLevel } = await import(pathToFileURL(join(dataDir, 'cards.js')).href);
 const { MODIFIERS, pickRandomModifiers } = await import(pathToFileURL(join(dataDir, 'modifiers.js')).href);
 const { getRole } = await import(pathToFileURL(join(dataDir, 'roles.js')).href);
-const { MASTERY_THRESHOLD, getServerMission, evaluateServerMission, chooseArchetype, chooseVariant, getPresentation, getEligibleTools, useConsultationTool, isNursingMission, getNursingTools, useNursingTool, transcriptConfirmedSymptoms, nursingLiveSymptoms, evaluateNursingHypothesis } = await import(pathToFileURL(join(__dirname, 'missions.js')).href);
+const { MASTERY_THRESHOLD, getServerMission, evaluateServerMission, chooseArchetype, chooseVariant, choosePsychologyCase, getPresentation, getEligibleTools, useConsultationTool, isNursingMission, isPsychologyMission, getNursingTools, getPsychologyTools, useNursingTool, usePsychologyTool, nursingLiveSymptoms, evaluateNursingHypothesis, evaluatePsychologyFormulation } = await import(pathToFileURL(join(__dirname, 'missions.js')).href);
 const { getOpenAIModel, buildMissionPatientPrompt } = await import(pathToFileURL(join(__dirname, 'missionPatient.js')).href);
 const { choosePatientTraits, chooseNonVerbalCue } = await import(pathToFileURL(join(__dirname, 'patientTraits.js')).href);
 const { MISSION_EVALUATION_SCHEMA, buildMissionEvaluationPrompt, normalizeMissionEvaluation } = await import(pathToFileURL(join(__dirname, 'missionEvaluation.js')).href);
@@ -264,6 +264,17 @@ Réponds JUSTE avec les puces (ex: • Fumeur actif \n• Allergie Pénicilline 
 }
 
 // ─── Start Session ───────────────────────────────────────────────
+// Test-only fixture: never enabled in production, and intentionally separate
+// from player-controlled query parameters so sessions stay server-authorized.
+if (process.env.NODE_ENV === 'test') app.post('/game/api/__test__/psychology-seed', (req, res) => {
+    const order = Math.max(1, Math.min(10, Number(req.body?.order) || 1));
+    const mission = getServerMission(`psychology-${order}`); const variant = mission?.blueprints?.[Number(req.body?.variant) || 0];
+    if (!mission || !variant) return res.status(400).json({ error: 'Fixture Psychology invalide.' });
+    const sessionId = crypto.randomUUID(); const patientTraits = choosePatientTraits(() => 0);
+    const opening = `${variant.opening} ${chooseNonVerbalCue(patientTraits, () => 0)}`;
+    sessions.set(sessionId, { createdAt: Date.now(), missionId: mission.id, roleId: 'psychology', mission, variant, archetype: 'reserved', patientTraits, usedTools: [], actions: [], interactionEvents: [], prompt: buildMissionPatientPrompt(variant, 'reserved', [], patientTraits), messages: [{ role: 'assistant', content: opening }] });
+    res.json({ sessionId, variantId: variant.id, patient: { name: { firstName: variant.patient.name, fullName: variant.patient.name, age: variant.patient.age }, opening }, tools: getPsychologyTools(mission), differential: mission.motifs, requiresSecureNextStep: Boolean(variant.requiredOrientation) });
+});
 app.post('/game/api/start', async (req, res) => {
     try {
         const { levelId, missionId, roleId, recentVariantIds = [] } = req.body;
@@ -272,14 +283,15 @@ app.post('/game/api/start', async (req, res) => {
             const role = getRole(roleId);
             if (!mission || mission.roleId !== roleId || !role?.unlocked) return res.status(400).json({ error: 'Mission ou rôle invalide' });
             const sessionId = crypto.randomUUID();
-            const variant = chooseVariant(mission, recentVariantIds);
+            const psychology = isPsychologyMission(mission);
+            const variant = psychology ? choosePsychologyCase(mission, recentVariantIds) : chooseVariant(mission, recentVariantIds);
             const archetype = chooseArchetype(mission);
             const patientTraits = choosePatientTraits();
             const nursing = isNursingMission(mission);
-            const presentation = nursing ? { opening: variant.opening } : getPresentation(variant, archetype);
+            const presentation = (nursing || psychology) ? { opening: variant.opening } : getPresentation(variant, archetype);
             const opening = `${presentation.opening} ${chooseNonVerbalCue(patientTraits)}`;
             sessions.set(sessionId, { createdAt: Date.now(), missionId, roleId, mission, variant, archetype, patientTraits, usedTools: [], actions: [], interactionEvents: [], prompt: buildMissionPatientPrompt(variant, archetype, [], patientTraits), messages: [{ role: 'assistant', content: opening }] });
-            return res.json({ sessionId, variantId: variant.id, patient: { name: { firstName: variant.patient.name, fullName: variant.patient.name, age: variant.patient.age, gender: variant.patient.gender }, opening, modifiers: [], antecedentsHtml: nursing ? 'Simulation éducative fictive — aucune donnée médicale réelle.' : 'Profil de consultation chargé.' }, tools: nursing ? getNursingTools(mission) : getEligibleTools(mission), differential: nursing ? mission.diseases.map(({ id, name, summary, symptoms }) => ({ id, name, summary, symptoms })) : [] });
+            return res.json({ sessionId, variantId: variant.id, patient: { name: { firstName: variant.patient.name, fullName: variant.patient.name, age: variant.patient.age, gender: variant.patient.gender }, opening, modifiers: [], antecedentsHtml: nursing || psychology ? '' : 'Profil du patient chargé.' }, tools: nursing ? getNursingTools(mission) : psychology ? getPsychologyTools(mission) : getEligibleTools(mission), differential: nursing ? mission.diseases.map(({ id, name, summary, symptoms }) => ({ id, name, summary, symptoms })) : psychology ? mission.motifs : [], requiresSecureNextStep: Boolean(variant.requiredOrientation) });
         }
         const level = getLevel(levelId);
         if (!level) return res.status(400).json({ error: 'Niveau invalide' });
@@ -367,16 +379,16 @@ app.post('/game/api/consultation-tool', (req, res) => {
     const session = sessions.get(sessionId);
     if (!session?.mission) return res.status(400).json({ error: 'Session expirée ou invalide.' });
     const usedToolIds = session.usedTools.map((item) => item.id);
-    const nursing = isNursingMission(session.mission);
-    const tool = nursing ? useNursingTool(session.variant, toolId, usedToolIds) : useConsultationTool(session.variant, toolId, usedToolIds);
-    const tools = nursing ? getNursingTools(session.mission) : getEligibleTools(session.mission);
+    const nursing = isNursingMission(session.mission); const psychology = isPsychologyMission(session.mission);
+    const tool = nursing ? useNursingTool(session.variant, toolId, usedToolIds) : psychology ? usePsychologyTool(session.variant, toolId, usedToolIds) : useConsultationTool(session.variant, toolId, usedToolIds);
+    const tools = nursing ? getNursingTools(session.mission) : psychology ? getPsychologyTools(session.mission) : getEligibleTools(session.mission);
     if (!tool || !tools.some((item) => item.id === toolId)) return res.json({ tool: null, tools });
     if (!tool.alreadyConsulted) {
         session.usedTools.push(tool);
         const notes = session.usedTools.flatMap((usedTool) => usedTool.promptNotes || []);
         session.prompt = buildMissionPatientPrompt(session.variant, session.archetype, notes, session.patientTraits);
     }
-    return res.json({ tool: { id: tool.id, label: tool.label, kind: tool.kind, evidence: tool.evidence }, tools });
+    return res.json({ tool: { id: tool.id, label: tool.label, kind: tool.kind, evidence: tool.evidence, alreadyConsulted: Boolean(tool.alreadyConsulted) }, tools });
 });
 
 app.post('/game/api/nursing-symptoms', (_req, res) => {
@@ -390,6 +402,26 @@ app.post('/game/api/nursing-hypothesis', async (req, res) => {
     if (result.error) return res.status(400).json(result);
     sessions.delete(req.body.sessionId);
     res.json(result);
+});
+
+app.post('/game/api/psychology-formulation', (req, res) => {
+    const session = sessions.get(req.body.sessionId);
+    if (!session?.mission || !isPsychologyMission(session.mission)) return res.status(400).json({ error: 'Session Psychology invalide.' });
+    const board = Array.isArray(req.body.board) ? [...new Set(req.body.board.filter((item) => typeof item === 'string' && item.length <= 500))] : [];
+    const supportFacts = session.usedTools.flatMap((tool) => {
+        const evidence = tool.evidence || {};
+        if (Array.isArray(evidence.entries)) return evidence.entries.map(({ moment, text }) => `${moment} : ${text}`);
+        if (Array.isArray(evidence.events)) return evidence.events;
+        if (Array.isArray(evidence.people)) return evidence.people.map(({ name, link }) => `${name} : ${link}`);
+        if (Array.isArray(evidence.steps)) return evidence.steps;
+        if (Array.isArray(evidence.fragments)) return evidence.fragments;
+        return [];
+    });
+    const authorized = new Set([...session.messages.filter((message) => message.role === 'assistant').map((message) => message.content), ...supportFacts]);
+    if (board.some((item) => !authorized.has(item))) return res.status(400).json({ error: 'Fait de formulation non autorisé.' });
+    const result = evaluatePsychologyFormulation(session, req.body.motifId, board, String(req.body.nextStep || ''));
+    if (result.error) return res.status(400).json(result);
+    sessions.delete(req.body.sessionId); return res.json(result);
 });
 
 app.post('/game/api/secure-next-step', (req, res) => {

@@ -1,5 +1,7 @@
 import { NURSING_POOLS, NURSING_DISEASES } from '../src/data/nursingCampaign.js';
 import { NURSING_DOCUMENT_DEFINITIONS, materializeNursingDossier } from './nursingDossiers.js';
+import { PSYCHOLOGY_POOLS, PSYCHOLOGY_MOTIFS } from '../src/data/psychologyCampaign.js';
+import { PSYCHOLOGY_DOSSIERS, getPsychologyTools as getPsychologyToolsForOrder, usePsychologySupport } from './psychologyDossiers.js';
 
 export const MASTERY_THRESHOLD = 70;
 const AXES = ['foodHistory', 'context', 'communication', 'safePlan'];
@@ -124,7 +126,7 @@ function makeBlueprint(frame, index) {
   const patient = patients[(missionIndex + index) % patients.length];
   return { id: `${missionId}-case-${index + 1}`, patient: { ...patient, age: 24 + ((index * 7 + missionIndex * 3) % 31) }, need: VARIANT_NEEDS[missionId][index], contributors: rotated, responseStyle: styles[index], evidence: { gallery: galleryPair, 'rhythm-journal': makeJournal(missionIndex, index), 'shopping-receipt': makeReceipt(missionIndex, index), 'pantry-fridge': makePantry(missionIndex, index), 'constraints-calendar': makeWeeklyCalendar(missionIndex, index) }, successSignals: [routes[index % routes.length], routes[(index + 1) % routes.length]] };
 }
-export const CASES = Object.fromEntries(frames.map((frame, order) => [frame[0], { id: frame[0], order: order + 1, theme: frame[1], blueprints: Array.from({ length: 6 }, (_, index) => makeBlueprint(frame, index)) }]));
+export const CASES = Object.fromEntries(frames.map((frame, order) => [frame[0], { id: frame[0], roleId: 'dietetics', order: order + 1, theme: frame[1], blueprints: Array.from({ length: 6 }, (_, index) => makeBlueprint(frame, index)) }]));
 const NURSING_PATIENTS = [{ name: 'Alex', gender: 'Homme' }, { name: 'Sam', gender: 'Homme' }, { name: 'Lina', gender: 'Femme' }, { name: 'Morgan', gender: 'Homme' }, { name: 'Noor', gender: 'Femme' }, { name: 'Camille', gender: 'Femme' }];
 const NURSING_VARIANT_STYLES = ['répond brièvement mais précisément', 'minimise au début', 'retrace volontiers la chronologie', 'aborde difficilement certains détails', 's’appuie sur des notes personnelles', 'la fatigue est présente mais la personne reste coopérative'];
 function nursingDocuments(order, diseaseId, variantIndex) {
@@ -144,8 +146,35 @@ function makeNursingMission(pool) {
   }))) };
 }
 export const NURSING_CASES = Object.freeze(Object.fromEntries(NURSING_POOLS.map((pool) => [`nursing-${pool.order}`, makeNursingMission(pool)])));
-export function getServerMission(id) { return CASES[id] || NURSING_CASES[id]; }
+export const PSYCHOLOGY_CASES = Object.freeze(Object.fromEntries(PSYCHOLOGY_POOLS.map((pool) => [`psychology-${pool.order}`, {
+  id: `psychology-${pool.order}`, roleId: 'psychology', order: pool.order, motifs: pool.motifIds.map((id) => PSYCHOLOGY_MOTIFS[id]),
+  blueprints: pool.motifIds.flatMap((id) => PSYCHOLOGY_DOSSIERS[id]),
+}])));
+export function getServerMission(id) { return CASES[id] || NURSING_CASES[id] || PSYCHOLOGY_CASES[id]; }
 export function isNursingMission(mission) { return mission?.roleId === 'nursing'; }
+export function isPsychologyMission(mission) { return mission?.roleId === 'psychology'; }
+export function choosePsychologyCase(mission, recentVariantIds = [], random = Math.random) {
+  const available = mission?.blueprints?.filter((item) => !recentVariantIds.includes(item.id));
+  const choices = available?.length ? available : mission?.blueprints || [];
+  return choices[Math.floor(random() * choices.length)] || null;
+}
+export function getPsychologyTools(mission) { return getPsychologyToolsForOrder(mission?.order || 0); }
+export function usePsychologyTool(variant, toolId, used = []) { return usePsychologySupport(variant, toolId, used); }
+export function evaluatePsychologyFormulation(session, motifId, board = [], nextStep = '') {
+  const motif = session?.mission?.motifs?.find((item) => item.id === motifId);
+  if (!motif) return { error: 'Formulation inconnue pour cette consultation.' };
+  const correct = motifId === session.variant.motifId;
+  // Psychology follows the same binary final-choice rule as Nursing: the right
+  // educational motif validates the mission; a different motif must be replayed.
+  return {
+    total: correct ? 100 : 0,
+    mastery: correct,
+    feedback: correct ? 'Bonne formulation identifiée.' : 'Cette formulation ne correspond pas au cas.',
+    improvement: correct ? 'Les éléments recueillis vont dans le même sens.' : 'Reprends les signes et le contexte avant de choisir un motif.',
+    safetyAcknowledged: true,
+    axes: {},
+  };
+}
 export function chooseNursingCase(mission, recentVariantIds = [], random = Math.random) { return chooseVariant(mission, recentVariantIds, random); }
 export function getNursingTools(mission) { return NURSING_DOCUMENT_DEFINITIONS.filter(([, order]) => mission.order >= order).map(([id, , label]) => ({ id, label, kind: 'nursing-document' })); }
 export function useNursingTool(variant, toolId, used = []) { const evidence = variant?.evidence?.[toolId]; if (!evidence) return null; return { id: toolId, label: evidence.title, kind: 'nursing-document', alreadyConsulted: used.includes(toolId), evidence, promptNotes: evidence.facts }; }
@@ -205,4 +234,4 @@ export function chooseArchetype(_mission, random = Math.random) { return ['direc
 export function getPresentation(variant, archetype) { const openings = { direct: 'Je préfère vous expliquer franchement ce qui se passe.', reserved: 'Je ne sais pas très bien par où commencer.', reflective: 'J’ai essayé de comprendre par moi-même, mais je tourne un peu en rond.', tired: 'Je voudrais que cela devienne un peu moins compliqué au quotidien.' }; return { opening: `${variant.need} ${openings[archetype] || openings.reserved}`, baselineFacts: variant.contributors.slice(0, 2) }; }
 function visualItem(assetId) { const filename = ASSETS[assetId]; if (!filename || !AVAILABLE_ASSET_IDS.has(assetId)) return { id: assetId, status: 'unavailable', label: 'Document indisponible' }; return { id: assetId, status: 'available', src: `/assets/dietetics/${filename}`, alt: 'Support visuel de consultation' }; }
 export function useConsultationTool(variant, toolId, used = []) { const tool = TOOL_DEFINITIONS.find((item) => item.id === toolId); if (!variant || !tool || !variant.evidence[toolId]) return null; const payload = variant.evidence[toolId]; const promptNotes = toolId === 'gallery' ? payload.slice(0, 2).map((assetId) => ASSET_NOTES[assetId]).filter(Boolean) : toolId === 'rhythm-journal' ? payload.entries.map((entry) => `${entry.time} : ${entry.entry} — ${entry.context}`) : toolId === 'shopping-receipt' ? payload.items.map((item) => `${item.quantity} de ${item.item} (${item.brand})`) : toolId === 'pantry-fridge' ? [...payload.pantry, ...payload.fridge].map((item) => `${item.quantity} de ${item.item}`) : toolId === 'constraints-calendar' ? payload.days.flatMap((day) => day.slots.map((slot) => `${day.day} ${day.date} : ${slot}`)) : payload; return { id: tool.id, label: tool.label, kind: tool.kind, alreadyConsulted: used.includes(toolId), evidence: toolId === 'gallery' ? { images: payload.slice(0, 2).map(visualItem) } : toolId === 'rhythm-journal' || toolId === 'shopping-receipt' || toolId === 'pantry-fridge' || toolId === 'constraints-calendar' ? payload : { notes: payload }, promptNotes }; }
-export function evaluateServerMission(_missionId, variant) { if (!variant) throw new Error('Cas invalide'); const scores = Object.fromEntries(AXES.map((axis) => [axis, 0])); return { scores, total: 0, mastery: false, safetyAcknowledged: true, evidence: Object.fromEntries(AXES.map((axis) => [axis, { count: 0, message: 'Évaluation IA indisponible.' }])), improvement: 'L’évaluation IA est nécessaire pour valider la maîtrise de la mission.' }; }
+export function evaluateServerMission(_missionId, variant) { if (!variant) throw new Error('Cas invalide'); const scores = Object.fromEntries(AXES.map((axis) => [axis, 0])); return { scores, total: 0, mastery: false, safetyAcknowledged: true, evidence: Object.fromEntries(AXES.map((axis) => [axis, { count: 0, message: 'Évaluation indisponible.' }])), improvement: 'L’évaluation est nécessaire pour valider la maîtrise de la mission.' }; }

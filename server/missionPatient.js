@@ -2,6 +2,10 @@ export const DEFAULT_OPENAI_MODEL = 'gpt-5.6-luna';
 export function getOpenAIModel(env = process.env) { return env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL; }
 function patientIdentity(variant) { return variant.patient.gender === 'Femme' ? 'une patiente' : 'un patient'; }
 export function buildMissionPatientPrompt(variant, archetype, toolEvidence = [], patientTraits = []) {
+  if (variant.motifId) {
+    const traits = patientTraits.map((trait) => trait.instruction).join('\n- ');
+    return `Tu incarnes ${variant.patient.name} dans une consultation de psychologie entièrement fictive. Réponds en français, à la première personne, en une ou deux phrases. Tu ne poses aucun diagnostic, ne prescris rien et ne fournis ni conseil clinique ni urgence réelle. Révèle les faits du cas progressivement, uniquement lorsqu’une question respectueuse et pertinente les appelle; une question pertinente reçoit toujours une réponse utile. Ne révèle pas tous les éléments dans une réponse, n’invente aucun fait et ne nomme jamais le motif éducatif. Les faits autorisés sont :\n- ${variant.facts.join('\n- ')}\nLes supports déjà consultés apportent :\n- ${toolEvidence.join('\n- ') || 'aucun'}\nTraits :\n- ${traits || 'Réponds avec attention et naturel.'}\nTon ouverture est : ${variant.opening}`;
+  }
   if (variant.diseaseId) {
     const symptoms = variant.symptoms.map((symptom) => symptom.label).join('\n- ');
     const traits = patientTraits.map((trait) => trait.instruction).join('\n- ');
